@@ -6,3 +6,5 @@ node_modules
 
 vue-app/.env
 vue-app/.env.local
+
+media/webview/*

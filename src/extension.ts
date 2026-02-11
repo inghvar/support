@@ -35,6 +35,44 @@ export function activate(context: vscode.ExtensionContext) {
 
 		const htmlContent = getWebviewContent(panel.webview, context.extensionPath);
 		panel.webview.html = htmlContent;
+
+        panel.webview.onDidReceiveMessage(
+	        async function(message) {
+                if (message.command === 'saveAuth') {
+                    await context.secrets.store('authToken', message.token);
+                    await context.globalState.update('user', message.user);
+                    console.log('Saved token:', message.token);
+                    console.log('Saved user:', JSON.stringify(message.user));
+                    vscode.window.showInformationMessage('Successfully logged in!');
+                    panel.webview.postMessage({
+                        command: 'authSaved',
+                        success: true
+                    });
+                }
+		        
+		        if (message.command === 'getAuth') {
+			        const token = await context.secrets.get('authToken');
+			        const user = context.globalState.get('user');
+			        panel.webview.postMessage({
+				        command: 'authData',
+				        token: token,
+				        user: user
+			        });
+		        }
+		        
+                if (message.command === 'logout') {
+                    await context.secrets.delete('authToken');
+                    await context.globalState.update('user', undefined);
+                    vscode.window.showInformationMessage('Logged out');
+                    panel.webview.postMessage({
+                        command: 'loggedOut',
+                        success: true
+                    });
+                }
+	        },
+	        undefined,
+	        context.subscriptions
+        );
 	});
 
 	context.subscriptions.push(disposable, openFormCommand);
