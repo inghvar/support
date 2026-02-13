@@ -1,7 +1,7 @@
 <template>
   <v-app id="inspire">
     <v-navigation-drawer
-      v-model="drawer"
+      permanent
       app
       :width="200"
       v-if="isLoggedIn"
@@ -19,7 +19,6 @@
     </v-navigation-drawer>
 
     <v-app-bar app v-if="isLoggedIn">
-      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-toolbar-title>Toolpath Extension</v-toolbar-title>
       <v-spacer></v-spacer>
     </v-app-bar>
@@ -35,7 +34,10 @@
               <v-progress-circular indeterminate></v-progress-circular>
             </div>
             <LoginView v-else-if="!isLoggedIn" />
-            <ConverterForm v-else-if="selectedView === 'converter'" />
+            <ConverterForm
+              v-else-if="selectedView === 'converter'"
+              :auth-token="userToken"
+            />
             <SettingsView v-else-if="selectedView === 'settings'" />
           </v-col>
         </v-row>
@@ -63,6 +65,7 @@ export default {
       selectedView: 'converter',
       isLoggedIn: false,
       isLoading: true,
+      userToken: null,
       menuItems: [
         { icon: 'mdi-saw-blade', text: 'Converter', value: 'converter' },
         { icon: 'mdi-cog', text: 'Settings', value: 'settings' }
@@ -76,12 +79,11 @@ export default {
   },
 
   mounted() {
-    // Проверяем, запущено ли в VSCode
     if (typeof acquireVsCodeApi !== 'undefined') {
       onMessage(this.handleAuthMessage)
       getAuth()
     } else {
-      // В браузере - показываем Login сразу
+      // in browser
       this.isLoading = false
       this.isLoggedIn = false
     }
@@ -93,6 +95,7 @@ export default {
         this.isLoading = false
         if (data.token && data.user) {
           this.isLoggedIn = true
+          this.userToken = data.token
           this.selectedView = 'converter'
         } else {
           this.isLoggedIn = false

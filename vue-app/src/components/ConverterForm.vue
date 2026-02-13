@@ -300,7 +300,13 @@ import { required, numeric, decimal, requiredIf } from '@vuelidate/validators'
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-const AUTH_TOKEN = import.meta.env.VITE_AUTH_TOKEN
+
+const props = defineProps({
+  authToken: {
+    type: String,
+    required: true
+  }
+})
 
 // Data
 const file = ref(null)
@@ -505,7 +511,7 @@ const getFitler = () => {
 const fetchCarvingStatus = async (taskId) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-status`, {
-      headers: { Authorization: `Token ${AUTH_TOKEN}` },
+      headers: { Authorization: `Token ${props.authToken}` },
       params: { task_id: taskId }
     })
     carvingStatus.value = response.data?.status
@@ -518,7 +524,7 @@ const fetchCarvingStatus = async (taskId) => {
 const downloadFile = async (taskId) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-carving`, {
-      headers: { Authorization: `Token ${AUTH_TOKEN}` },
+      headers: { Authorization: `Token ${props.authToken}` },
       params: { task_id: taskId }
     })
     
@@ -636,7 +642,7 @@ const converter = async () => {
       url: endpoint,
       data: formData,
       headers: {
-        Authorization: `Token ${AUTH_TOKEN}`,
+        Authorization: `Token ${props.authToken}`,
         'Content-Type': 'multipart/form-data'
       }
     })
@@ -709,7 +715,7 @@ const getVectorized = async () => {
       url: `${API_BASE_URL}/api/converter/v1/get-vectorized`,
       data: formData,
       headers: {
-        Authorization: `Token ${AUTH_TOKEN}`,
+        Authorization: `Token ${props.authToken}`,
         'Content-Type': 'multipart/form-data'
       }
     })
