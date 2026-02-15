@@ -281,12 +281,14 @@
       </template>
     </v-snackbar>
 
-    <!-- 3D Canvas Placeholder -->
+    <!-- 3D Canvas -->
     <div v-if="showCanvas" class="mt-4">
       <v-card>
-        <v-card-title>G-code Preview (Coming Soon)</v-card-title>
+        <v-card-title>G-code Preview</v-card-title>
         <v-card-text>
-          <pre style="max-height: 300px; overflow: auto;">{{ generatedGcodePreview }}</pre>
+          <ThreeCanvasHelp
+            :gcode-source="generatedGcodeText"
+          />
         </v-card-text>
       </v-card>
     </div>
@@ -297,6 +299,7 @@ import { ref, computed, watch } from 'vue'
 import axios from 'axios'
 import { useVuelidate } from '@vuelidate/core'
 import { required, numeric, decimal, requiredIf } from '@vuelidate/validators'
+import ThreeCanvasHelp from './ThreeCanvasHelp.vue'
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
