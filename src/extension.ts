@@ -39,31 +39,44 @@ export function activate(context: vscode.ExtensionContext) {
 
         panel.webview.onDidReceiveMessage(
 	        async function(message) {
-                if (message.command === 'saveAuth') {
-                    await context.secrets.store('authToken', message.token);
-                    await context.globalState.update('user', message.user);
-                    console.log('Saved token:', message.token);
-                    console.log('Saved user:', JSON.stringify(message.user));
-                    vscode.window.showInformationMessage('Successfully logged in!');
-                    panel.webview.postMessage({
-                        command: 'authSaved',
-                        success: true
-                    });
-                }
-		        
-		        if (message.command === 'getAuth') {
+            if (message.command === 'saveAuth') {
+                await context.secrets.store('authToken', message.token);
+                await context.globalState.update('user', message.user);
+                console.log('Saved token:', message.token);
+                console.log('Saved user:', JSON.stringify(message.user));
+                vscode.window.showInformationMessage('Successfully logged in!');
+                panel.webview.postMessage({
+                    command: 'authSaved',
+                    success: true
+                });
+            }
+        
+            if (message.command === 'getAuth') {
                     await getAuth(panel, context);
-		        }
-		        
-                if (message.command === 'logout') {
-                    await context.secrets.delete('authToken');
-                    await context.globalState.update('user', undefined);
-                    vscode.window.showInformationMessage('Logged out');
-                    panel.webview.postMessage({
-                        command: 'loggedOut',
-                        success: true
-                    });
-                }
+            }
+        
+            if (message.command === 'logout') {
+                await context.secrets.delete('authToken');
+                await context.globalState.update('user', undefined);
+                vscode.window.showInformationMessage('Logged out');
+                panel.webview.postMessage({
+                    command: 'loggedOut',
+                    success: true
+                });
+            }
+
+            if (message.command === 'saveGcodeFile') {
+                const content = message.gcode;
+                const fileName = message.fileName;
+                const uri = await vscode.window.showSaveDialog({
+                    filters: { 'G-code': ['gcode', 'nc'] },
+                    defaultUri: vscode.Uri.file(fileName),
+                    saveLabel: 'Save'
+                });
+                if (!uri) return;
+                await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
+                vscode.window.showInformationMessage('File saved successfully!');
+            }
 	        },
 	        undefined,
 	        context.subscriptions

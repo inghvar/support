@@ -26,7 +26,7 @@
     <v-dialog v-model="dialogp" persistent width="300">
       <v-card color="#a52906" dark>
         <v-card-text id="progress">
-          Do not switch tab until processing is done
+          Creating a preview
           <v-progress-linear v-model="progress" height="25" color="green">
             <strong>{{ Math.ceil(progress) }}%</strong>
           </v-progress-linear>
@@ -66,7 +66,7 @@ export default {
     FrontIcon,
     IsometricIcon
   },
-  data () {
+  data() {
     return {
       progress: null,
       dialogp: false,
@@ -77,7 +77,7 @@ export default {
       coordinateZ: 0
     }
   },
-  mounted () {
+  mounted() {
     const lines = this.gcodeSource.split('\n')
     // console.log(lines)
     this.isLongGcode = lines.length > 10000
@@ -109,7 +109,7 @@ export default {
     this.editorRun()
   },
   methods: {
-    initThree () {
+    initThree() {
       // console.log(gcodeText)
       // vector for loops
       this.tmpStartVec = new THREE.Vector3()
@@ -318,9 +318,9 @@ export default {
           var radsq = Math.pow(R, 2)
           var q = Math.sqrt(
             (dataArc.endPoint.x - dataArc.startPoint.x) *
-              (dataArc.endPoint.x - dataArc.startPoint.x) +
-              (dataArc.endPoint.z - dataArc.startPoint.z) *
-                (dataArc.endPoint.z - dataArc.startPoint.z)
+            (dataArc.endPoint.x - dataArc.startPoint.x) +
+            (dataArc.endPoint.z - dataArc.startPoint.z) *
+            (dataArc.endPoint.z - dataArc.startPoint.z)
           )
           var x3 = (dataArc.startPoint.x + dataArc.endPoint.x) / 2
           var y3 = (dataArc.startPoint.z + dataArc.endPoint.z) / 2
@@ -330,22 +330,22 @@ export default {
             centerX =
               x3 +
               Math.sqrt(radsq - (q / 2) * (q / 2)) *
-                ((dataArc.startPoint.z - dataArc.endPoint.z) / q)
+              ((dataArc.startPoint.z - dataArc.endPoint.z) / q)
             centerZ =
               y3 +
               Math.sqrt(radsq - (q / 2) * (q / 2)) *
-                ((dataArc.endPoint.x - dataArc.startPoint.x) / q)
+              ((dataArc.endPoint.x - dataArc.startPoint.x) / q)
           } else {
             // second center point (if R < 0)
             R = Math.abs(R)
             centerX =
               x3 -
               Math.sqrt(radsq - (q / 2) * (q / 2)) *
-                ((dataArc.startPoint.z - dataArc.endPoint.z) / q)
+              ((dataArc.startPoint.z - dataArc.endPoint.z) / q)
             centerZ =
               y3 -
               Math.sqrt(radsq - (q / 2) * (q / 2)) *
-                ((dataArc.endPoint.x - dataArc.startPoint.x) / q)
+              ((dataArc.endPoint.x - dataArc.startPoint.x) / q)
           }
         }
 
@@ -445,9 +445,9 @@ export default {
           var radsq = Math.pow(R, 2)
           var q = Math.sqrt(
             (dataArc.endPoint.x - dataArc.startPoint.x) *
-              (dataArc.endPoint.x - dataArc.startPoint.x) +
-              (dataArc.endPoint.z - dataArc.startPoint.z) *
-                (dataArc.endPoint.z - dataArc.startPoint.z)
+            (dataArc.endPoint.x - dataArc.startPoint.x) +
+            (dataArc.endPoint.z - dataArc.startPoint.z) *
+            (dataArc.endPoint.z - dataArc.startPoint.z)
           )
           var x3 = (dataArc.startPoint.x + dataArc.endPoint.x) / 2
           var y3 = (dataArc.startPoint.z + dataArc.endPoint.z) / 2
@@ -456,21 +456,21 @@ export default {
             centerX =
               x3 -
               Math.sqrt(radsq - (q / 2) * (q / 2)) *
-                ((dataArc.startPoint.z - dataArc.endPoint.z) / q)
+              ((dataArc.startPoint.z - dataArc.endPoint.z) / q)
             centerZ =
               y3 -
               Math.sqrt(radsq - (q / 2) * (q / 2)) *
-                ((dataArc.endPoint.x - dataArc.startPoint.x) / q)
+              ((dataArc.endPoint.x - dataArc.startPoint.x) / q)
           } else {
             R = Math.abs(R)
             centerX =
               x3 +
               Math.sqrt(radsq - (q / 2) * (q / 2)) *
-                ((dataArc.startPoint.z - dataArc.endPoint.z) / q)
+              ((dataArc.startPoint.z - dataArc.endPoint.z) / q)
             centerZ =
               y3 +
               Math.sqrt(radsq - (q / 2) * (q / 2)) *
-                ((dataArc.endPoint.x - dataArc.startPoint.x) / q)
+              ((dataArc.endPoint.x - dataArc.startPoint.x) / q)
           }
         }
 
@@ -567,7 +567,7 @@ export default {
       this.render()
     },
 
-    async longTask (i, model) {
+    async longTask(i, model) {
       // console.log(i)
       // console.log(model)
       var line = model
@@ -675,7 +675,7 @@ export default {
       }
     },
 
-    async editorRun () {
+    async editorRun() {
       if (this.isLongGcode) {
         this.dialogp = true
       }
@@ -695,11 +695,11 @@ export default {
       for (let i = 1; i <= lineCount; i++) {
         promises.push(this.longTask(i, lines[i]))
         processed++
-          if (lineCount > 100000 && !(i % 100000)) {
-            await new Promise(resolve => setTimeout(resolve, 1))
-          } else if (lineCount > 10000 && lineCount <= 100000 && !(i % 10000)) {
-            await new Promise(resolve => setTimeout(resolve, 1))
-          }
+        if (lineCount > 100000 && !(i % 100000)) {
+          await new Promise(resolve => setTimeout(resolve, 1))
+        } else if (lineCount > 10000 && lineCount <= 100000 && !(i % 10000)) {
+          await new Promise(resolve => setTimeout(resolve, 1))
+        }
       }
       await Promise.all(promises)
       clearInterval(progressTimer)

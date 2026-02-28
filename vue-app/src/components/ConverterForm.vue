@@ -1,297 +1,186 @@
-<template>
-    <h2 class="create-title">Image to G-code Converter</h2>
-    <v-card>
-      <v-card-text>
-        <p>
-          Upload your image to convert it to G-code
-        </p>
-        <p>Supported formats: PNG, JPEG, SVG</p>
-        
-        <v-form ref="form" @submit.prevent="submit">
-          <v-divider class="my-4"></v-divider>
+F<template>
+  <h2 class="create-title">Image to G-code Converter</h2>
+  <v-card>
+    <v-card-text>
+      <p>
+        Upload your image to convert it to G-code
+      </p>
+      <p>Supported formats: PNG, JPEG, SVG</p>
 
-          <!-- Processing Mode -->
-          <p class="radio-title">Processing Mode</p>
-          <v-radio-group
-            v-model="mode"
-            :error-messages="v$.mode.$errors.map(e => e.$message)"
-            @update:model-value="onModeChange"
-          >
-            <v-radio label="Engraving" value="ME"></v-radio>
-            <v-radio label="Carving" value="MC"></v-radio>
-          </v-radio-group>
+      <v-form ref="form" @submit.prevent="submit">
+        <v-divider class="my-4"></v-divider>
 
-          <!-- File Upload -->
-          <v-file-input
-            v-model="file"
-            show-size
-            counter
-            accept="image/png, image/jpeg, image/svg+xml"
-            :rules="fileInputRules"
-            :error-messages="v$.file.$errors.map(e => e.$message)"
-            label="Upload Image"
-            @update:model-value="onFileChange"
-          ></v-file-input>
+        <!-- Processing Mode -->
+        <p class="radio-title">Processing Mode</p>
+        <v-radio-group v-model="mode" :error-messages="v$.mode.$errors.map(e => e.$message)"
+          @update:model-value="onModeChange">
+          <v-radio label="Engraving" value="ME"></v-radio>
+          <v-radio label="Carving (2.5D)" value="MC"></v-radio>
+        </v-radio-group>
 
-          <!-- Image Preview -->
-          <div class="file-preview" v-if="imageUrl">
-            <v-img
-              :src="imageUrl"
-              style="border: 1px dashed #ccc; min-height: 250px; max-height: 400px"
-              contain
-            />
-          </div>
+        <!-- File Upload -->
+        <div>
+          <v-file-input v-model="file" show-size counter accept="image/png, image/jpeg, image/svg+xml"
+            :rules="fileInputRules" :error-messages="v$.file.$errors.map(e => e.$message)" label="Upload Image"
+            @update:model-value="onFileChange"></v-file-input>
+        </div>
 
-          <!-- Vectorized Image Preview (for SVG engraving) -->
-          <div v-if="isSVG && mode === 'ME' && tracingMode" class="my-4">
-            <p class="vectorized-title">Check vectorized image:</p>
-            <div class="vectorized-image" v-html="fileURL"></div>
-          </div>
+        <!-- Image Preview -->
+        <div class="file-preview" v-if="imageUrl">
+          <v-img :src="imageUrl" style="border: 1px dashed #ccc; min-height: 250px; max-height: 400px" contain />
+        </div>
 
-          <!-- Filter Slider (for SVG engraving) -->
-          <v-slider
-            v-if="isSVG && mode === 'ME' && tracingMode"
-            v-model="filterCoefficient"
-            :ticks="ticksLabels"
-            :max="4"
-            :step="1"
-            show-ticks="always"
-            tick-size="4"
-            color="primary"
-            track-color="success"
-            thumb-label
-            label="Filter Strength"
-            @update:model-value="getVectorized"
-          >
-            <template v-slot:tick-label="{ index }">
-              {{ ticksLabels[index] }}
-            </template>
-          </v-slider>
+        <!-- Vectorized Image Preview (for SVG engraving) -->
+        <div v-if="isSVG && mode === 'ME' && tracingMode" class="my-4">
+          <p class="vectorized-title">Check vectorized image:</p>
+          <div class="vectorized-image" v-html="fileURL"></div>
+        </div>
 
-          <!-- Background Switch (for SVG engraving) -->
-          <v-switch
-            v-if="isSVG && mode === 'ME' && tracingMode"
-            v-model="background"
-            color="primary"
-            label="Set Background"
-            @update:model-value="onBackgroundChange"
-          ></v-switch>
-
-          <!-- Tracing Mode (for SVG engraving) -->
-          <div v-if="isSVG && mode === 'ME'" class="my-4">
-            <p class="tracing-title">Type of Tracing</p>
-            <v-radio-group
-              v-model="tracingMode"
-              :error-messages="v$.tracingMode.$errors.map(e => e.$message)"
-              @update:model-value="onTracingModeChange"
-            >
-              <v-radio label="Outline" value="OT"></v-radio>
-              <v-radio label="Centerline" value="CT"></v-radio>
-            </v-radio-group>
-          </div>
-
-          <!-- Carving Parameters -->
-          <template v-if="mode === 'MC'">
-            <v-text-field
-              v-model.number="workpieceThickness"
-              :error-messages="v$.workpieceThickness.$errors.map(e => e.$message)"
-              label="Workpiece Thickness (mm)"
-              :rules="workpieceThicknessRules"
-              type="number"
-              variant="outlined"
-              class="my-2"
-            ></v-text-field>
-
-            <v-text-field
-              v-model.number="stepDepth"
-              :error-messages="v$.stepDepth.$errors.map(e => e.$message)"
-              label="Step Depth (mm)"
-              :rules="stepDepthRules"
-              type="number"
-              variant="outlined"
-              class="my-2"
-            ></v-text-field>
-
-            <v-select
-              v-model="typeProcessing"
-              :items="['out', 'in']"
-              label="Type of Processing"
-              variant="outlined"
-              class="my-2"
-            ></v-select>
+        <!-- Filter Slider (for SVG engraving) -->
+        <v-slider v-if="isSVG && mode === 'ME' && tracingMode" v-model="filterCoefficient" :tick-labels="ticksLabels"
+          :max="4" :step="1" show-ticks="always" tick-size="4" color="primary" track-color="success" thumb-label
+          @update:model-value="getVectorized">
+          <template v-slot:tick-label="{ index }">
+            {{ ticksLabels[index] }}
           </template>
+        </v-slider>
 
-          <!-- Max Size (for SVG) -->
-          <v-text-field
-            v-if="isSVG"
-            v-model.number="maxSize"
-            :error-messages="v$.maxSize.$errors.map(e => e.$message)"
-            label="Max Size (mm) - Reduce Image"
-            type="number"
-            variant="outlined"
-            class="my-2"
-          ></v-text-field>
+        <!-- Background Switch (for SVG engraving) -->
+        <v-switch v-if="isSVG && mode === 'ME' && tracingMode" v-model="background" color="primary"
+          label="Set Background" @update:model-value="onBackgroundChange"></v-switch>
 
-          <!-- Tolerance -->
-          <v-text-field
-            v-model.number="tolerance"
-            :error-messages="v$.tolerance.$errors.map(e => e.$message)"
-            label="Tolerance"
-            :rules="toleranceRules"
-            type="number"
-            step="0.01"
-            variant="outlined"
-            class="my-2"
-          ></v-text-field>
+        <!-- Tracing Mode (for SVG engraving) -->
+        <div v-if="isSVG && mode === 'ME'" class="my-4">
+          <p class="tracing-title">Type of Tracing</p>
+          <v-radio-group v-model="tracingMode" :error-messages="v$.tracingMode.$errors.map(e => e.$message)"
+            @update:model-value="onTracingModeChange">
+            <v-radio label="Outline" value="OT"></v-radio>
+            <v-radio label="Centerline" value="CT"></v-radio>
+          </v-radio-group>
+        </div>
 
-          <!-- Feed Speed -->
-          <v-text-field
-            v-model.number="feedSpeed"
-            :error-messages="v$.feedSpeed.$errors.map(e => e.$message)"
-            label="Rapid Speed (mm/min)"
-            :rules="rapidRules"
-            type="number"
-            variant="outlined"
-            class="my-2"
-          ></v-text-field>
+        <!-- Carving Parameters -->
+        <template v-if="mode === 'MC'">
+          <v-text-field v-model.number="workpieceThickness"
+            :error-messages="v$.workpieceThickness.$errors.map(e => e.$message)" label="Workpiece Thickness (mm)"
+            :rules="workpieceThicknessRules" type="number" variant="outlined" class="my-2"></v-text-field>
 
-          <!-- Cutting Speed -->
-          <v-text-field
-            v-model.number="cuttingSpeed"
-            :error-messages="v$.cuttingSpeed.$errors.map(e => e.$message)"
-            label="Cutting Speed (mm/min)"
-            :rules="cuttingRules"
-            type="number"
-            variant="outlined"
-            class="my-2"
-          ></v-text-field>
+          <v-text-field v-model.number="stepDepth" :error-messages="v$.stepDepth.$errors.map(e => e.$message)"
+            label="Step Depth (mm)" :rules="stepDepthRules" type="number" variant="outlined"
+            class="my-2"></v-text-field>
 
-          <!-- Coordinate Z -->
-          <v-text-field
-            v-model.number="coordinateZ"
-            :error-messages="v$.coordinateZ.$errors.map(e => e.$message)"
-            label="Z Coordinate (mm)"
-            type="number"
-            variant="outlined"
-            class="my-2"
-          ></v-text-field>
+          <v-select v-model="typeProcessing" :items="['out', 'in']" label="Type of Processing" variant="outlined"
+            class="my-2"></v-select>
+        </template>
 
-          <!-- Cutting Depth (for engraving) -->
-          <v-text-field
-            v-if="mode === 'ME'"
-            v-model.number="cuttingDepth"
-            :error-messages="v$.cuttingDepth.$errors.map(e => e.$message)"
-            label="Cutting Depth (mm)"
-            :rules="cuttingDepthRules"
-            :messages="cuttingDepthWarnings"
-            type="number"
-            variant="outlined"
-            class="my-2"
-          ></v-text-field>
+        <!-- Max Size -->
+        <div class="row-converter" v-if="isSVG">
+          <p>Set, Max Size, if you want to reduce the image (the largest side will be</p>
+          <p>reduced, the smallest side proportionally)</p>
+          <v-text-field v-if="isSVG" v-model.number="maxSize" :error-messages="v$.maxSize.$errors.map(e => e.$message)"
+            label="Max Size (in pixel)" type="number" variant="outlined" class="my-2"></v-text-field>
+        </div>
 
-          <!-- Passes -->
-          <v-text-field
-            v-model.number="passes"
-            :error-messages="v$.passes.$errors.map(e => e.$message)"
-            label="Passes (default 1)"
-            :rules="passesRules"
-            type="number"
-            variant="outlined"
-            class="my-2"
-          ></v-text-field>
+        <!-- Tolerance -->
+        <p>Set Tolerance (distance between approximation points)</p>
+        <v-text-field v-model.number="tolerance" :error-messages="v$.tolerance.$errors.map(e => e.$message)"
+          label="Tolerance (default 0.2 mm)" :rules="toleranceRules" type="number" step="0.01" variant="outlined"
+          class="my-2"></v-text-field>
 
-          <!-- Pass Depth -->
-          <v-text-field
-            v-model.number="passDepth"
-            :error-messages="v$.passDepth.$errors.map(e => e.$message)"
-            label="Pass Depth (default 1 mm)"
-            :rules="passDepthRules"
-            type="number"
-            variant="outlined"
-            class="my-2"
-          ></v-text-field>
+        <!-- Feed Speed -->
+        <v-text-field v-model.number="feedSpeed" :error-messages="v$.feedSpeed.$errors.map(e => e.$message)"
+          label="Rapid Speed (default 300 mm/min)" :rules="rapidRules" type="number" variant="outlined"
+          class="my-2"></v-text-field>
 
-          <!-- Header -->
-          <v-textarea
-            v-model="header"
-            :error-messages="v$.header.$errors.map(e => e.$message)"
-            label="Header G-code"
-            variant="outlined"
-            rows="3"
-            class="my-2"
-          ></v-textarea>
+        <!-- Cutting Speed -->
+        <v-text-field v-model.number="cuttingSpeed" :error-messages="v$.cuttingSpeed.$errors.map(e => e.$message)"
+          label="Cutting Speed (default 150 mm/min)" :rules="cuttingRules" type="number" variant="outlined"
+          class="my-2"></v-text-field>
 
-          <!-- End -->
-          <v-textarea
-            v-model="end"
-            :error-messages="v$.end.$errors.map(e => e.$message)"
-            label="End G-code"
-            variant="outlined"
-            rows="3"
-            class="my-2"
-          ></v-textarea>
+        <!-- Coordinate Z -->
+        <v-text-field v-model.number="coordinateZ" :error-messages="v$.coordinateZ.$errors.map(e => e.$message)"
+          label="Coordinate Z, cutting tool lifting height (50 mm)" type="number" variant="outlined"
+          class="my-2"></v-text-field>
 
-          <!-- Submit Button -->
-          <v-btn
-            type="submit"
-            color="success"
-            size="large"
-            :disabled="processingFrozen"
-            class="mt-4"
-          >
-            Process Image
-          </v-btn>
+        <!-- Cutting Depth (for engraving) -->
+        <v-text-field v-if="mode === 'ME'" v-model.number="cuttingDepth"
+          :error-messages="v$.cuttingDepth.$errors.map(e => e.$message)"
+          label="Cutting depth - total milling depth (default 3 mm)" :rules="cuttingDepthRules"
+          :messages="cuttingDepthWarnings" type="number" variant="outlined" class="my-2"></v-text-field>
 
-          <!-- Response Messages -->
-          <div class="response mt-4">
-            <v-alert v-if="submitStatus === 'OK'" type="success">
-              G-code generated successfully! File downloaded.
-            </v-alert>
-            <v-alert v-if="submitStatus === 'ERROR'" type="error">
-              {{ backendError }}
-            </v-alert>
-            <v-alert v-if="submitStatus === 'PENDING'" type="info">
-              <span v-if="mode === 'ME'">Processing...</span>
-              <span v-else>Processing may take a few minutes...</span>
-            </v-alert>
-          </div>
-        </v-form>
+        <!-- Passes -->
+        <v-text-field v-model.number="passes" :error-messages="v$.passes.$errors.map(e => e.$message)"
+          label="Passes (default 1)" :rules="passesRules" type="number" variant="outlined" class="my-2"></v-text-field>
 
-        <!-- Progress Bar -->
-        <v-progress-linear
-          v-if="loadingProgressBar"
-          indeterminate
-          color="success"
-          class="mt-4"
-        ></v-progress-linear>
+        <!-- Pass Depth -->
+        <v-text-field v-model.number="passDepth" :error-messages="v$.passDepth.$errors.map(e => e.$message)"
+          label="Pass Depth (default 1 mm)" :rules="passDepthRules" type="number" variant="outlined"
+          class="my-2"></v-text-field>
+
+        <!-- Header -->
+        <v-textarea v-model="header" :error-messages="v$.header.$errors.map(e => e.$message)" label="Header G-code"
+          variant="outlined" rows="3" class="my-2"></v-textarea>
+
+        <!-- End -->
+        <v-textarea v-model="end" :error-messages="v$.end.$errors.map(e => e.$message)" label="End G-code"
+          variant="outlined" rows="3" class="my-2"></v-textarea>
+
+        <!-- Submit Button -->
+        <v-btn type="submit" color="success" size="large" :disabled="processingFrozen" class="mt-4">
+          Process Image
+        </v-btn>
+
+        <!-- Response Messages -->
+        <div class="response mt-4">
+          <v-alert v-if="submitStatus === 'OK'" type="success">
+            G-code generated successfully! File downloaded.
+          </v-alert>
+          <v-alert v-if="submitStatus === 'ERROR'" type="error">
+            {{ backendError }}
+          </v-alert>
+          <v-alert v-if="submitStatus === 'PENDING'" type="info">
+            <span v-if="mode === 'ME'">Processing...</span>
+            <span v-else>Processing may take a few minutes...</span>
+          </v-alert>
+        </div>
+      </v-form>
+
+      <!-- Progress Bar -->
+      <v-progress-linear v-if="loadingProgressBar" indeterminate color="success" class="mt-4"></v-progress-linear>
+    </v-card-text>
+  </v-card>
+
+  <!-- Snackbar -->
+  <v-snackbar v-model="snackbar" :timeout="3000" location="top right" color="success">
+    <v-icon start>mdi-alert-circle</v-icon>
+    {{ snackbarText }}
+    <template v-slot:actions>
+      <v-btn size="small" @click="snackbar = false">X</v-btn>
+    </template>
+  </v-snackbar>
+
+  <!-- Save file dialog -->
+  <v-dialog v-model="showSaveDialog" max-width="400">
+    <v-card>
+      <v-card-title class="text-h6">Save file?</v-card-title>
+      <v-card-text>Do you want to download the file?</v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn color="primary" @click="onSaveClick">Save file</v-btn>
+        <v-btn color="secondary" @click="showSaveDialog = false">Cancel</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- 3D Canvas -->
+  <div v-if="showCanvas" class="mt-4">
+    <v-card>
+      <v-card-title>G-code Preview</v-card-title>
+      <v-card-text>
+        <ThreeCanvasHelp :gcode-source="generatedGcodeText" />
       </v-card-text>
     </v-card>
-
-    <!-- Snackbar -->
-    <v-snackbar
-      v-model="snackbar"
-      :timeout="3000"
-      location="top right"
-      color="success"
-    >
-      <v-icon start>mdi-alert-circle</v-icon>
-      {{ snackbarText }}
-      <template v-slot:actions>
-        <v-btn size="small" @click="snackbar = false">X</v-btn>
-      </template>
-    </v-snackbar>
-
-    <!-- 3D Canvas -->
-    <div v-if="showCanvas" class="mt-4">
-      <v-card>
-        <v-card-title>G-code Preview</v-card-title>
-        <v-card-text>
-          <ThreeCanvasHelp
-            :gcode-source="generatedGcodeText"
-          />
-        </v-card-text>
-      </v-card>
-    </div>
+  </div>
 </template>
 
 <script setup>
@@ -300,6 +189,7 @@ import axios from 'axios'
 import { useVuelidate } from '@vuelidate/core'
 import { required, numeric, decimal, requiredIf } from '@vuelidate/validators'
 import ThreeCanvasHelp from './ThreeCanvasHelp.vue'
+import { sendMessage } from '../vscodeApi';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
@@ -344,6 +234,10 @@ const carvingTask = ref('')
 const processingFrozen = ref(false)
 const passDepth = ref('')
 const passes = ref('')
+const showSaveDialog = ref(false)
+
+let fileContent = ''
+let fileName = ''
 
 const ticksLabels = [
   'No Filter',
@@ -394,8 +288,8 @@ const passesRules = [
 ]
 
 const cuttingDepthRules = [
-  value => value > 0 || 'Value must be greater than 0',
-  value => value <= 24 || 'Value must be less than or equal to 24 mm'
+  value => value === '' || value > 0 || 'Value must be greater than 0',
+  value => value === '' || value <= 24 || 'Value must be less than or equal to 24 mm'
 ]
 
 // Vuelidate setup
@@ -484,9 +378,9 @@ const onBackgroundChange = () => {
 
 const onFileChange = (newFile) => {
   if (!newFile) return
-  
+
   file.value = newFile
-  
+
   if (newFile.type !== 'image/svg+xml') {
     isSVG.value = true
     if (mode.value === 'ME' || mode.value === '') {
@@ -495,7 +389,7 @@ const onFileChange = (newFile) => {
   } else {
     isSVG.value = false
   }
-  
+
   createImage(newFile)
   backendError.value = ''
 }
@@ -530,11 +424,7 @@ const downloadFile = async (taskId) => {
       headers: { Authorization: `Token ${props.authToken}` },
       params: { task_id: taskId }
     })
-    
-    const fileURL = window.URL.createObjectURL(new Blob([response.data]))
-    const fileLink = document.createElement('a')
-    fileLink.href = fileURL
-    
+
     let contentDisposition = response.headers['content-disposition']
     if (/=\?utf-8\?b\?/i.test(contentDisposition)) {
       const b64 = contentDisposition.match(/=\?utf-8\?b\?(.*?)\?=/i)[1]
@@ -543,12 +433,11 @@ const downloadFile = async (taskId) => {
         Uint8Array.from(decoded, c => c.charCodeAt(0))
       )
     }
-    
-    const fileName = contentDisposition.split(';')[1].split('=')[1].replace(/"/g, '')
-    fileLink.setAttribute('download', fileName)
-    document.body.appendChild(fileLink)
-    fileLink.click()
-    
+    const fileName = contentDisposition.split(';')[1].split('=')[1].replace(/"/g, '') + '.nc';
+    sendMessage('saveGcodeFile', {
+      gcode: response.data,
+      fileName: fileName
+    });
     submitStatus.value = 'OK'
     loadingProgressBar.value = false
     processingFrozen.value = false
@@ -566,7 +455,7 @@ const checkCarvingStatus = async (taskId) => {
   while (true) {
     await fetchCarvingStatus(taskId)
     const status = carvingStatus.value
-    
+
     if (status === 'SUCCESS') {
       await downloadFile(taskId)
       break
@@ -583,25 +472,34 @@ const checkCarvingStatus = async (taskId) => {
 const submit = async () => {
   console.log('submit!')
   showCanvas.value = false
-  
+
   const isValid = await v$.value.$validate()
   if (!isValid) {
     submitStatus.value = 'ERROR'
     backendError.value = 'Please fill all required fields correctly'
     return
   }
-  
+
   await converter()
+}
+
+
+function onSaveClick() {
+  showSaveDialog.value = false;
+  sendMessage('saveGcodeFile', {
+    gcode: fileContent,
+    fileName: fileName
+  });
 }
 
 const converter = async () => {
   submitStatus.value = 'PENDING'
   loadingProgressBar.value = true
   processingFrozen.value = true
-  
+
   const filter = getFitler()
   const formData = new FormData()
-  
+
   if (feedSpeed.value !== '') formData.append('movement_speed', feedSpeed.value)
   if (cuttingSpeed.value !== '') formData.append('cutting_speed', cuttingSpeed.value)
   if (coordinateZ.value !== '') formData.append('coordinate_z', coordinateZ.value)
@@ -620,7 +518,7 @@ const converter = async () => {
   if (typeProcessing.value !== '') formData.append('type_processing', typeProcessing.value)
   if (passDepth.value !== '') formData.append('pass_depth', passDepth.value)
   if (passes.value !== '') formData.append('passes', passes.value)
-  
+
   let endpoint = ''
   switch (mode.value) {
     case 'ME':
@@ -638,7 +536,7 @@ const converter = async () => {
       processingFrozen.value = false
       return
   }
-  
+
   try {
     const response = await axios({
       method: 'post',
@@ -649,12 +547,8 @@ const converter = async () => {
         'Content-Type': 'multipart/form-data'
       }
     })
-    
+
     if (response.status === 200) {
-      const fileURL = window.URL.createObjectURL(new Blob([response.data]))
-      const fileLink = document.createElement('a')
-      fileLink.href = fileURL
-      
       let contentDisposition = response.headers['content-disposition']
       if (/=\?utf-8\?b\?/i.test(contentDisposition)) {
         const b64 = contentDisposition.match(/=\?utf-8\?b\?(.*?)\?=/i)[1]
@@ -663,12 +557,9 @@ const converter = async () => {
           Uint8Array.from(decoded, c => c.charCodeAt(0))
         )
       }
-      
-      const fileName = contentDisposition.split(';')[1].split('=')[1].replace(/"/g, '') + '.nc'
-      fileLink.setAttribute('download', fileName)
-      document.body.appendChild(fileLink)
-      fileLink.click()
-      
+      fileName = contentDisposition.split(';')[1].split('=')[1].replace(/"/g, '') + '.nc';
+      fileContent = response.data;
+      showSaveDialog.value = true;
       submitStatus.value = 'OK'
       loadingProgressBar.value = false
       processingFrozen.value = false
@@ -689,7 +580,7 @@ const converter = async () => {
     loadingProgressBar.value = false
     processingFrozen.value = false
     backendError.value = error.response?.data?.detail || error.response?.data || error.message
-    
+
     if (backendError.value === 'Invalid token.') {
       snackbarText.value = 'Only registered users can create G-code'
       backendError.value = 'Only registered users can create G-code'
@@ -702,16 +593,16 @@ const converter = async () => {
 
 const getVectorized = async () => {
   if (tracingMode.value === '') return
-  
+
   const filter = getFitler()
   const formData = new FormData()
-  
+
   if (file.value) formData.append('file', file.value)
   if (filterCoefficient.value !== 0) formData.append('filter_coefficient', filter)
   if (maxSize.value !== '') formData.append('max_size', maxSize.value)
   formData.append('background', background.value)
   if (tracingMode.value !== '') formData.append('tracing_mode', tracingMode.value)
-  
+
   try {
     const response = await axios({
       method: 'post',
@@ -722,7 +613,7 @@ const getVectorized = async () => {
         'Content-Type': 'multipart/form-data'
       }
     })
-    
+
     if (response.status === 200) {
       fileURL.value = response.data
       submitStatus.value = ''
@@ -733,7 +624,7 @@ const getVectorized = async () => {
     console.error('Vectorization error:', error)
     submitStatus.value = 'ERROR'
     backendError.value = error.response?.data?.detail || error.response?.data || error.message
-    
+
     if (backendError.value === 'Invalid token.') {
       snackbarText.value = 'Only registered users can create G-code'
       backendError.value = 'Only registered users can create G-code'
@@ -770,6 +661,10 @@ const getVectorized = async () => {
   margin: 16px 0;
 }
 
+.row-converter {
+  margin-bottom: -20px;
+}
+
 .vectorized-title {
   font-weight: 500;
   margin-bottom: 8px;
@@ -782,5 +677,14 @@ const getVectorized = async () => {
   border: 1px solid #e0e0e0;
   padding: 8px;
   border-radius: 4px;
+}
+
+.response {
+  margin-top: 16px;
+}
+
+.response .v-alert {
+  padding: 8px 16px !important;
+  min-height: auto !important;
 }
 </style>
