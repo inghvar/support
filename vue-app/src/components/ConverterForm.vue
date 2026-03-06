@@ -637,6 +637,12 @@ const getVectorized = async () => {
 </script>
 
 <style scoped>
+body, html {
+  width: 100%;
+  height: 100%;
+  background: var(--vscode-sash-hoverBorder) !important;
+}
+
 .response {
   margin-top: 16px;
 }
