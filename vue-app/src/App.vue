@@ -10,6 +10,11 @@
     <v-app-bar app v-if="isLoggedIn">
       <v-toolbar-title>Toolpath Extension</v-toolbar-title>
       <v-spacer></v-spacer>
+      <v-btn
+        v-if="isLoggedIn"
+        icon="mdi-logout"
+        @click="logout"
+      />
     </v-app-bar>
 
     <v-main>
@@ -19,8 +24,13 @@
             <div v-if="isLoading" class="text-center">
               <v-progress-circular indeterminate></v-progress-circular>
             </div>
-            <LoginView v-else-if="!isLoggedIn" />
+
+            <LoginView v-else-if="!isLoggedIn" @change-view="selectedView = $event" />
+
+            <RegisterView v-else-if="selectedView === 'register'" @change-view="selectedView = $event" />
+
             <ConverterForm v-else-if="selectedView === 'converter'" :auth-token="userToken" />
+
             <SettingsView v-else-if="selectedView === 'settings'" />
           </v-col>
         </v-row>
@@ -33,13 +43,15 @@
 import ConverterForm from './components/ConverterForm.vue'
 import SettingsView from './views/SettingsView.vue'
 import LoginView from './components/LoginView.vue'
-import { getAuth, onMessage } from './vscodeApi'
+import RegisterView from './components/RegisterView.vue'
+import { getAuth, onMessage, logout } from './vscodeApi'
 
 export default {
   components: {
     ConverterForm,
     SettingsView,
-    LoginView
+    LoginView,
+    RegisterView
   },
 
   data() {
@@ -84,6 +96,14 @@ export default {
         this.isLoggedIn = true
         this.selectedView = 'converter'
       }
+
+      if (data.command === 'loggedOut') {
+        this.isLoggedIn = false
+        this.userToken = null
+      }
+    },
+    logout() {
+      logout()
     }
   }
 }

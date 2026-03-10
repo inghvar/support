@@ -38,6 +38,10 @@
         <p v-if="submitStatus === 'PENDING'">Sending...</p>
       </div>
     </v-form>
+    <div class="register-link">
+      Don’t have an account?
+      <a href="#" @click.prevent="emit('change-view', 'register')">Register</a>
+    </div>
   </v-layout>
 </template>
 
@@ -54,6 +58,8 @@ const email = ref('')
 const password = ref('')
 const submitStatus = ref('')
 const backendError = ref('')
+
+const emit = defineEmits(['change-view'])
 
 const rules = {
   email: { required, email: emailValidator },
