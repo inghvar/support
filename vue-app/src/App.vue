@@ -8,7 +8,17 @@
     </v-navigation-drawer>
 
     <v-app-bar app v-if="isLoggedIn">
-      <v-toolbar-title>Toolpath Extension</v-toolbar-title>
+    <v-toolbar-title>
+      Toolpath Extension
+      <a
+        href="https://toolpath.tech"
+        target="_blank"
+        rel="noopener noreferrer"
+        style="margin-left: 12px;"
+      >
+        Go To Website
+      </a>
+    </v-toolbar-title>
       <v-spacer></v-spacer>
       <v-btn
         v-if="isLoggedIn"
@@ -25,13 +35,24 @@
               <v-progress-circular indeterminate></v-progress-circular>
             </div>
 
-            <LoginView v-else-if="!isLoggedIn" @change-view="selectedView = $event" />
+            <RegisterView
+              v-if="!isLoggedIn && selectedView === 'register'"
+              @change-view="selectedView = $event"
+            />
 
-            <RegisterView v-else-if="selectedView === 'register'" @change-view="selectedView = $event" />
+            <LoginView
+              v-else-if="!isLoggedIn && selectedView === 'login'"
+              @change-view="selectedView = $event"
+            />
 
-            <ConverterForm v-else-if="selectedView === 'converter'" :auth-token="userToken" />
+            <ConverterForm
+              v-else-if="isLoggedIn && selectedView === 'converter'"
+              :auth-token="userToken"
+            />
 
-            <SettingsView v-else-if="selectedView === 'settings'" />
+            <SettingsView
+              v-else-if="isLoggedIn && selectedView === 'settings'"
+            />
           </v-col>
         </v-row>
       </v-container>
@@ -57,7 +78,7 @@ export default {
   data() {
     return {
       drawer: true,
-      selectedView: 'converter',
+      selectedView: 'register',
       isLoggedIn: false,
       isLoading: true,
       userToken: null,
@@ -83,16 +104,19 @@ export default {
     handleAuthMessage(data) {
       if (data.command === 'authData') {
         this.isLoading = false
+
         if (data.token && data.user) {
           this.isLoggedIn = true
           this.userToken = data.token
           this.selectedView = 'converter'
         } else {
           this.isLoggedIn = false
+          this.selectedView = 'register'
         }
       }
 
       if (data.command === 'authSaved') {
+        getAuth()
         this.isLoggedIn = true
         this.selectedView = 'converter'
       }
@@ -100,6 +124,7 @@ export default {
       if (data.command === 'loggedOut') {
         this.isLoggedIn = false
         this.userToken = null
+        this.selectedView = 'register'
       }
     },
     logout() {

@@ -6,7 +6,7 @@
         <h2 class="createProfileHeader">Create Profile</h2>
         <v-col cols="12">
           <v-text-field
-            v-model="email"
+            v-model="emailValue"
             :error-messages="emailErrors"
             label="Email*"
             required
@@ -67,7 +67,9 @@
 
       <v-row>
         <v-col cols="12">
-          <input type="checkbox" v-model="checked" /> I agree with Terms
+          <input type="checkbox" v-model="checked" />
+          I agree with
+          <a href="https://toolpath.tech/terms" target="_blank">Terms</a>
         </v-col>
       </v-row>
 
@@ -79,6 +81,13 @@
       >
         Create
       </v-btn>
+
+      <div class="login-link">
+        Already have an account?
+        <a href="#" @click.prevent="$emit('change-view', 'login')">
+          Log in here
+        </a>
+      </div>
 
       <div class="response">
         <p v-if="submitStatus === 'TERMS'">You must accept Terms</p>
@@ -98,6 +107,7 @@ import { ref, computed } from 'vue'
 import axios from 'axios'
 import { useVuelidate } from '@vuelidate/core'
 import { required, minLength, email, sameAs } from '@vuelidate/validators'
+import { saveAuth } from '../vscodeApi'
 
 const formRef = ref(null)
 
@@ -176,12 +186,17 @@ function Registration() {
 
   axios({
     method: 'post',
-    url: `${import.meta.env.VITE_API_BASE_URL}/api/users/v1/registration/`,
+    url: `${import.meta.env.VITE_API_BASE_URL}/api/users/v1/vsc-registration/`,
     data: formData,
     headers: { 'Content-Type': 'multipart/form-data' }
   })
     .then(response => {
       if (response.status === 201) {
+        const token = response.data.token
+        const user = response.data.user
+
+        saveAuth(token, user)
+
         submitStatus.value = 'OK'
       } else {
         submitStatus.value = 'ERROR'
@@ -229,5 +244,18 @@ function submit() {
 
 .layout-down {
   margin-top: 40px;
+}
+
+.login-link {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.login-link a {
+  color: #1976d2;
+  font-weight: bold;
+  text-decoration: underline;
+  cursor: pointer;
 }
 </style>

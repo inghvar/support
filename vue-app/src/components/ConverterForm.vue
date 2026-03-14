@@ -133,7 +133,7 @@ F<template>
         <!-- Response Messages -->
         <div class="response mt-4">
           <v-alert v-if="submitStatus === 'OK'" type="success">
-            G-code generated successfully! File downloaded.
+            G-code generated successfully. You can download it.
           </v-alert>
           <v-alert v-if="submitStatus === 'ERROR'" type="error">
             {{ backendError }}
@@ -159,23 +159,22 @@ F<template>
     </template>
   </v-snackbar>
 
-  <!-- Save file dialog -->
-  <v-dialog v-model="showSaveDialog" max-width="400">
-    <v-card>
-      <v-card-title class="text-h6">Save file?</v-card-title>
-      <v-card-text>Do you want to download the file?</v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <v-btn color="primary" @click="onSaveClick">Save file</v-btn>
-        <v-btn color="secondary" @click="showSaveDialog = false">Cancel</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
-
   <!-- 3D Canvas -->
   <div v-if="showCanvas" class="mt-4">
     <v-card>
-      <v-card-title>G-code Preview</v-card-title>
+      <v-card-title class="d-flex align-center">
+        G-code Preview
+
+        <v-btn
+          v-if="generatedGcodeText"
+          class="ml-4"
+          color="primary"
+          :disabled="processingFrozen"
+          @click="onSaveClick"
+        >
+          Save G-code
+        </v-btn>
+      </v-card-title>
       <v-card-text>
         <ThreeCanvasHelp :gcode-source="generatedGcodeText" />
       </v-card-text>
@@ -433,11 +432,9 @@ const downloadFile = async (taskId) => {
         Uint8Array.from(decoded, c => c.charCodeAt(0))
       )
     }
-    const fileName = contentDisposition.split(';')[1].split('=')[1].replace(/"/g, '') + '.nc';
-    sendMessage('saveGcodeFile', {
-      gcode: response.data,
-      fileName: fileName
-    });
+    fileName = contentDisposition.split(';')[1].split('=')[1].replace(/"/g, '');
+    fileContent = response.data;
+
     submitStatus.value = 'OK'
     loadingProgressBar.value = false
     processingFrozen.value = false
@@ -559,7 +556,6 @@ const converter = async () => {
       }
       fileName = contentDisposition.split(';')[1].split('=')[1].replace(/"/g, '') + '.nc';
       fileContent = response.data;
-      showSaveDialog.value = true;
       submitStatus.value = 'OK'
       loadingProgressBar.value = false
       processingFrozen.value = false
