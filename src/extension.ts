@@ -25,8 +25,8 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // Register command to open webview with Vue form
-  const openFormCommand = vscode.commands.registerCommand(
-    "toolpath.openForm",
+  const millingCommand = vscode.commands.registerCommand(
+    "toolpath.milling",
     () => {
       const panel = vscode.window.createWebviewPanel(
         "toolpathForm",
@@ -96,7 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  context.subscriptions.push(disposable, openFormCommand);
+  context.subscriptions.push(disposable, millingCommand);
 }
 
 function getWebviewContent(

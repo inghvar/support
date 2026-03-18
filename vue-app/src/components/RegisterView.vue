@@ -74,6 +74,7 @@
       </v-row>
 
       <v-btn
+        class="create-button"
         color="success"
         block
         type="submit"
@@ -234,6 +235,7 @@ function submit() {
 .createProfileHeader {
   padding-left: 10px;
   padding-top: 20px;
+  margin-bottom: 20px;
 }
 
 .wide-form {
@@ -257,5 +259,9 @@ function submit() {
   font-weight: bold;
   text-decoration: underline;
   cursor: pointer;
+}
+
+.create-button {
+  margin-top: 22px;
 }
 </style>

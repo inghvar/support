@@ -1,71 +1,120 @@
-# toolpath README
+# Toolpath
 
-This is the README for your extension "toolpath". After writing up a brief description, we recommend including the following sections.
+**Generate, visualize, and analyze CNC G-code directly inside Visual Studio Code.**
 
-## Features
-
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
-
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+Toolpath is a powerful extension that transforms images into precise machining instructions and lets you preview toolpaths without leaving your editor.
 
 ---
 
-## Following extension guidelines
+## 🚀 Key Features
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+### 🖼️ Image → G-code
+Convert images into CNC toolpaths in seconds:
+- 2D and 2.5D milling
+- Laser engraving
+- Fast and automated workflow
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+### 👁️ Toolpath Visualization
+- Preview G-code before running it on your machine
+- Inspect tool movements and detect issues early
+- Reduce costly mistakes
 
-## Working with Markdown
+### ⚡ All-in-One Workflow
+- No need for external CAM software
+- Everything happens inside VS Code
+- Faster iteration and debugging
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+---
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+## 📸 Screenshots
+### Original image
+![Generation](images/image-to-gcode.png)
+### Toolpath visualization
+![Visualization](images/visualization.png)
 
-## For more information
+---
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+## ⚙️ How It Works
 
-**Enjoy!**
+1. Open the Toolpath panel in VS Code
+2. Load an image
+3. Configure machining parameters
+4. Generate G-code
+5. Preview the toolpath
+6. Export and run on your CNC machine
+
+---
+
+## 🧩 Use Cases
+
+- PCB milling
+- Laser engraving from images
+- Rapid prototyping
+- CNC hobby projects
+- Toolpath debugging and analysis
+
+---
+
+## 💡 Why Toolpath?
+
+Traditional CNC workflow is slow and fragmented:
+- Multiple programs
+- Complex setup
+- Constant switching
+
+**Toolpath simplifies everything:**
+
+- ✔ Generate G-code instantly
+- ✔ Visualize before cutting
+- ✔ Stay inside your dev environment
+- ✔ Iterate faster
+
+---
+
+## 🛠️ Features Inside VS Code
+
+Toolpath adds a dedicated interface where you can:
+
+- Generate G-code from images
+- Preview toolpaths in real time
+- Work with CNC files alongside your code
+
+---
+
+## 🔧 Requirements
+
+- Visual Studio Code
+- CNC machine (optional)
+- Basic understanding of G-code (recommended)
+
+---
+
+## 🚧 Roadmap
+
+We are actively developing Toolpath and plan to add:
+
+- 🔥 CNC laser support
+  Generate optimized G-code for laser engraving and cutting
+
+- 🧠 Enhanced 2.5D machining
+  More control, strategies, and precision
+
+- 🧊 3D machining support
+  Full 3D toolpath generation
+
+- 🔌 CNC machine integration
+  Connect to GRBLHal controllers via USB
+  Control your CNC machine directly from VS Code
+
+---
+
+## 📄 License
+
+MIT
+
+---
+
+## ⚠️ Disclaimer
+
+Always verify generated G-code before running it on real hardware.
+Improper toolpaths may damage your machine or material.

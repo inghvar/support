@@ -20,6 +20,11 @@
       </a>
     </v-toolbar-title>
       <v-spacer></v-spacer>
+
+      <span v-if="isLoggedIn && user" class="user-greeting">
+        Hi, {{ user.first_name }} {{ user.last_name }}
+      </span>
+
       <v-btn
         v-if="isLoggedIn"
         icon="mdi-logout"
@@ -82,6 +87,7 @@ export default {
       isLoggedIn: false,
       isLoading: true,
       userToken: null,
+      user: null,
       menuItems: [
         { icon: 'mdi-saw-blade', text: 'Converter', value: 'converter' },
         { icon: 'mdi-cog', text: 'Settings', value: 'settings' }
@@ -108,6 +114,7 @@ export default {
         if (data.token && data.user) {
           this.isLoggedIn = true
           this.userToken = data.token
+          this.user = data.user
           this.selectedView = 'converter'
         } else {
           this.isLoggedIn = false
@@ -133,3 +140,17 @@ export default {
   }
 }
 </script>
+
+<style>
+
+.user-greeting {
+  margin-right: 12px;
+  padding: 6px 14px;
+  background-color: #cfe8d5;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #1b1b1b;
+}
+
+</style>

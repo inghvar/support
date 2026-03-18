@@ -2,7 +2,7 @@
   <v-layout justify-center class="layout-down">
     <v-form @submit.prevent="submit" ref="formRef" lazy-validation class="wide-form">
       <v-row>
-        <v-col cols="10" lg="12">
+        <v-col cols="12">
           <h2 class="loginHeader">Login</h2>
           <v-text-field
             v-model="email"
@@ -15,7 +15,7 @@
       </v-row>
 
       <v-row>
-        <v-col cols="10" lg="12">
+        <v-col cols="12">
           <v-text-field
             v-model="password"
             :error-messages="passwordErrors"
@@ -27,9 +27,14 @@
         </v-col>
       </v-row>
 
-      <v-btn color="success" block class="mr-4" type="submit">
-        Login
-      </v-btn>
+      <v-row>
+        <v-col cols="12">
+          <v-btn color="success" block type="submit">
+            Login
+          </v-btn>
+        </v-col>
+      </v-row>
+
       <div class="response">
         <p v-if="submitStatus === 'OK'">You're now logged in!</p>
         <p v-if="submitStatus === 'ERROR'">
@@ -37,11 +42,11 @@
         </p>
         <p v-if="submitStatus === 'PENDING'">Sending...</p>
       </div>
+      <div class="register-link">
+        Don’t have an account?
+        <a href="#" @click.prevent="emit('change-view', 'register')">Register</a>
+      </div>
     </v-form>
-    <div class="register-link">
-      Don’t have an account?
-      <a href="#" @click.prevent="emit('change-view', 'register')">Register</a>
-    </div>
   </v-layout>
 </template>
 
@@ -190,5 +195,11 @@ onMounted(() => {
 }
 .button-facebook {
   font-size: 14px;
+}
+
+.register-link {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 16px;
 }
 </style>

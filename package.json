@@ -1,27 +1,69 @@
 {
-  "name": "toolpath",
-  "displayName": "toolpath",
-  "description": "CNC machine control and CAM tools",
+  "name": "support",
+  "displayName": "CNC Tools - G-code Generator and Machine Control",
   "version": "0.0.3",
+  "description": "CNC machine control and CAM tools",
+  "license": "MIT",
+  "icon": "icon.png",
+  "publisher": "toolpath",
+  "homepage": "https://toolpath.tech",
+  "bugs": {
+    "url": "https://github.com/microsoft/vscode-wordcount/issues",
+    "email": "sean@contoso.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/vscode-wordcount.git"
+  },
   "engines": {
-    "vscode": "^1.108.0"
+    "vscode": "^1.109.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Programming Languages",
+    "Visualization"
   ],
-  "activationEvents": [],
+  "keywords": [
+    "cnc",
+    "cam",
+    "gcode",
+    "toolpath",
+    "machine-control"
+  ],
+  "galleryBanner": {
+    "color": "#1f2937",
+    "theme": "dark"
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
+      // {
+      //  "command": "toolpath.helloWorld",
+      //  "title": "Hello World"
+      // },
       {
-        "command": "toolpath.helloWorld",
-        "title": "Hello World"
-      },
-      {
-        "command": "toolpath.openForm",
-        "title": "Open Toolpath Form"
+        "command": "toolpath.milling",
+        "title": "Generate Gcode For Milling"
       }
     ]
+  },
+  "activationEvents": [],
+  "badges": [],
+  "markdown": "github",
+  "qna": false,
+  "extensionPack": [],
+  "extensionDependencies": [],
+  "extensionKind": [
+    "ui"
+  ],
+  "pricing": "Free",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": {
+      "supported": true
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -40,6 +82,7 @@
     "@types/vscode": "^1.109.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.7.1",
     "eslint": "^9.39.2",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",

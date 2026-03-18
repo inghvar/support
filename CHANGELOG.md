@@ -1,9 +1,6 @@
-# Change Log
+Version 0.0.3: March 18, 2026
 
-All notable changes to the "toolpath" extension will be documented in this file.
-
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
-- Initial release
+Enhancements
+- First public version of Toolpath
+- Initial toolpath visualization
+- Initial G-code generation features
