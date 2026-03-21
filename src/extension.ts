@@ -3,7 +3,14 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import * as dotenv from "dotenv";
 import axios from "axios";
+
+dotenv.config({
+  path: path.join(__dirname, "..", ".env"),
+});
+
+const API_URL = process.env.API_URL;
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -130,7 +137,7 @@ function getWebviewContent(
 async function validateToken(token: string): Promise<boolean> {
   try {
     const response = await axios.post(
-      "http://127.0.0.1:8000/api/users/v1/user_info/",
+      `${API_URL}/api/users/v1/user_info/`,
       {
         token,
       },
@@ -161,7 +168,7 @@ async function getAuth(
     } else {
       // token not valid
       await context.secrets.delete("authToken");
-      await context.secrets.delete("user");
+      await context.globalState.update("user", undefined);
       currentPanel?.webview.postMessage({
         command: "authData",
         token: null,
