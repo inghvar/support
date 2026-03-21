@@ -6,10 +6,6 @@ import * as fs from "fs";
 import * as dotenv from "dotenv";
 import axios from "axios";
 
-dotenv.config({
-  path: path.join(__dirname, "..", ".env"),
-});
-
 const API_URL = process.env.API_URL;
 
 // This method is called when your extension is activated

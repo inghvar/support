@@ -3,6 +3,9 @@
 'use strict';
 
 const path = require('path');
+const webpack = require('webpack');
+
+require('dotenv').config();
 
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
@@ -44,5 +47,10 @@ const extensionConfig = {
   infrastructureLogging: {
     level: "log", // enables logging required for problem matchers
   },
+  plugins: [
+    new webpack.EnvironmentPlugin({
+      API_URL: process.env.API_URL
+    })
+  ]
 };
 module.exports = [ extensionConfig ];
