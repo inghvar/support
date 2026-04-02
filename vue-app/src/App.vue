@@ -1,9 +1,16 @@
 <template>
   <v-app id="inspire">
     <v-navigation-drawer permanent app :width="200" v-if="isLoggedIn">
+
       <v-list>
-        <v-list-item v-for="item in menuItems" :key="item.icon" :prepend-icon="item.icon" :title="item.text"
-          @click="selectedView = item.value" :active="selectedView === item.value"></v-list-item>
+        <v-list-item 
+          v-for="item in menuItems"
+          :key="item.icon"
+          :prepend-icon="item.icon"
+          :title="item.text"
+          @click="changeView(item.value)"
+          :active="selectedView === item.value">
+        </v-list-item>
       </v-list>
     </v-navigation-drawer>
 
@@ -39,24 +46,11 @@
             <div v-if="isLoading" class="text-center">
               <v-progress-circular indeterminate></v-progress-circular>
             </div>
-
-            <RegisterView
-              v-if="!isLoggedIn && selectedView === 'register'"
-              @change-view="selectedView = $event"
-            />
-
-            <LoginView
-              v-else-if="!isLoggedIn && selectedView === 'login'"
-              @change-view="selectedView = $event"
-            />
-
-            <ConverterForm
-              v-else-if="isLoggedIn && selectedView === 'converter'"
-              :auth-token="userToken"
-            />
-
-            <SettingsView
-              v-else-if="isLoggedIn && selectedView === 'settings'"
+            <component
+              v-if="!isLoading"
+              :is="currentViewComponent"
+              v-bind="currentViewProps"
+              @change-view="changeView"
             />
           </v-col>
         </v-row>
@@ -70,11 +64,13 @@ import ConverterForm from './components/ConverterForm.vue'
 import SettingsView from './views/SettingsView.vue'
 import LoginView from './components/LoginView.vue'
 import RegisterView from './components/RegisterView.vue'
+import LaserForm from './components/LaserPage.vue'
 import { getAuth, onMessage, logout } from './vscodeApi'
 
 export default {
   components: {
     ConverterForm,
+    LaserForm,
     SettingsView,
     LoginView,
     RegisterView
@@ -90,6 +86,7 @@ export default {
       user: null,
       menuItems: [
         { icon: 'mdi-saw-blade', text: 'Converter', value: 'converter' },
+        { icon: 'mdi-laser-pointer', text: 'Laser', value: 'laser' },
         { icon: 'mdi-cog', text: 'Settings', value: 'settings' }
       ]
     }
@@ -106,18 +103,44 @@ export default {
     }
   },
 
+  computed: {
+    currentViewComponent() {
+      if (!this.isLoggedIn) {
+        if (this.selectedView === 'login') return 'LoginView'
+        return 'RegisterView'
+      }
+
+      if (this.selectedView === 'laser') return 'LaserForm'
+      if (this.selectedView === 'settings') return 'SettingsView'
+
+      return 'ConverterForm'
+    },
+
+    currentViewProps() {
+      if (this.isLoggedIn) {
+        return { 'auth-token': this.userToken }
+      }
+
+      return {}
+    }
+  },
+
   methods: {
+    changeView(view) {
+      this.selectedView = view
+    },
+
     handleAuthMessage(data) {
       if (data.command === 'authData') {
         this.isLoading = false
-
         if (data.token && data.user) {
           this.isLoggedIn = true
           this.userToken = data.token
           this.user = data.user
-          this.selectedView = 'converter'
         } else {
           this.isLoggedIn = false
+          this.userToken = null
+          this.user = null
           this.selectedView = 'register'
         }
       }
@@ -125,12 +148,12 @@ export default {
       if (data.command === 'authSaved') {
         getAuth()
         this.isLoggedIn = true
-        this.selectedView = 'converter'
       }
 
       if (data.command === 'loggedOut') {
         this.isLoggedIn = false
         this.userToken = null
+        this.user = null
         this.selectedView = 'register'
       }
     },
