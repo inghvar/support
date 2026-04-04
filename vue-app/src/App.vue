@@ -85,7 +85,7 @@ export default {
       userToken: null,
       user: null,
       menuItems: [
-        { icon: 'mdi-saw-blade', text: 'Converter', value: 'converter' },
+        { icon: 'mdi-saw-blade', text: 'Milling', value: 'milling' },
         { icon: 'mdi-laser-pointer', text: 'Laser', value: 'laser' },
         { icon: 'mdi-cog', text: 'Settings', value: 'settings' }
       ]

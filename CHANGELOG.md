@@ -1,3 +1,9 @@
+Version 0.1.1: April 3, 2026
+
+Enhancements
+- Interface improvements
+
+
 Version 0.1.0: March 30, 2026
 
 Enhancements

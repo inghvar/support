@@ -1,6 +1,6 @@
 F
 <template>
-  <h2 class="create-title">Image to G-code Converter</h2>
+  <h2 class="create-title">G-code generation for milling</h2>
   <v-card>
     <v-card-text>
       <p>Upload your image to convert it to G-code</p>

@@ -1,8 +1,9 @@
-# Toolpath
+# Support
 
 **Generate, visualize, and analyze CNC G-code directly inside Visual Studio Code.**
 
 Toolpath is a powerful extension that transforms images into precise machining instructions and lets you preview toolpaths without leaving your editor.
+Requires one-time registration within the extension!
 
 ---
 
