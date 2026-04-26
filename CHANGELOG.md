@@ -1,3 +1,8 @@
+Version 0.1.2: April 26, 2026
+
+Enhancements
+- Change README
+
 Version 0.1.1: April 3, 2026
 
 Enhancements
