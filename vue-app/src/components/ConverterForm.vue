@@ -123,17 +123,45 @@ F
         </template>
 
         <!-- Max Size -->
-        <div class="row-converter" v-if="isSVG">
+        <div class="row-converter" v-if="mode === 'MC'">
           <p>Set, Max Size, if you want to reduce the image (the largest side will be</p>
           <p>reduced, the smallest side proportionally)</p>
           <v-text-field
-            v-if="isSVG"
+            v-if="mode === 'MC'"
             v-model.number="maxSize"
             :error-messages="v$.maxSize.$errors.map((e) => e.$message)"
             label="Max Size (in pixel)"
             type="number"
             variant="outlined"
             class="my-2"
+          ></v-text-field>
+        </div>
+
+        <div class="row-converter" v-if="mode === 'ME'">
+          <p>Height of the processing area</p>
+          <v-text-field
+            v-model.number="height"
+            :error-messages="heightErrors"
+            label="Height (mm)"
+            :rules="heightRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+            @update:model-value="v$.height.$touch()"
+          ></v-text-field>
+        </div>
+
+        <div class="row-converter" v-if="mode === 'ME'">
+          <p>Width of the processing area</p>
+          <v-text-field
+            v-model.number="width"
+            :error-messages="widthErrors"
+            label="Width (mm)"
+            :rules="widthRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+            @update:model-value="v$.width.$touch()"
           ></v-text-field>
         </div>
 
@@ -350,6 +378,8 @@ const carvingTask = ref('')
 const processingFrozen = ref(false)
 const passDepth = ref('')
 const passes = ref('')
+const height = ref('')
+const width = ref('')
 const showSaveDialog = ref(false)
 
 let fileContent = ''
@@ -365,7 +395,7 @@ const ticksLabels = [
 
 // Validation Rules
 const fileInputRules = [
-  (value) => !value || value.size <= 1024 * 1000 * 15 || 'Image size should be less than 15 MB',
+  (value) => !value || value.size <= 1024 * 1000 * 25 || 'Image size should be less than 25 MB',
   (value) => !value || value.size >= 1024 * 1 || 'Image size should be greater than 1 KB',
   (value) =>
     !value ||
@@ -409,6 +439,10 @@ const cuttingDepthRules = [
   (value) => value === '' || value <= 24 || 'Value must be less than or equal to 24 mm',
 ]
 
+const heightRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
+
+const widthRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
+
 // Vuelidate setup
 const rules = {
   file: { required },
@@ -417,6 +451,14 @@ const rules = {
   coordinateZ: { numeric },
   cuttingDepth: { numeric },
   maxSize: { numeric },
+  height: {
+    numeric,
+    heightWithWidth: (value) => (!!value && !!width.value) || (!value && !width.value),
+  },
+  width: {
+    numeric,
+    widthWithHeight: (value) => (!!value && !!height.value) || (!value && !height.value),
+  },
   tolerance: { decimal },
   mode: { required },
   tracingMode: {
@@ -437,6 +479,8 @@ const v$ = useVuelidate(rules, {
   coordinateZ,
   cuttingDepth,
   maxSize,
+  height,
+  width,
   tolerance,
   mode,
   tracingMode,
@@ -464,6 +508,22 @@ const generatedGcodePreview = computed(() => {
   if (!generatedGcodeText.value) return ''
   const lines = generatedGcodeText.value.split('\n')
   return lines.slice(0, 100).join('\n') + (lines.length > 100 ? '\n\n... (truncated)' : '')
+})
+
+const heightErrors = computed(() => {
+  const errors = []
+  if (!v$.value.height.$dirty) return errors
+  if (!v$.value.height.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.height.heightWithWidth) errors.push('Fill both height and width.')
+  return errors
+})
+
+const widthErrors = computed(() => {
+  const errors = []
+  if (!v$.value.width.$dirty) return errors
+  if (!v$.value.width.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.width.widthWithHeight) errors.push('Fill both height and width.')
+  return errors
 })
 
 // Methods
@@ -618,6 +678,8 @@ const converter = async () => {
   if (cuttingSpeed.value !== '') formData.append('cutting_speed', cuttingSpeed.value)
   if (coordinateZ.value !== '') formData.append('coordinate_z', coordinateZ.value)
   if (cuttingDepth.value !== '') formData.append('cutting_depth', cuttingDepth.value)
+  if (height.value !== '') formData.append('height', height.value)
+  if (width.value !== '') formData.append('width', width.value)
   if (file.value) formData.append('file', file.value)
   if (maxSize.value !== '') formData.append('max_size', maxSize.value)
   if (filterCoefficient.value !== 0) formData.append('filter_coefficient', filter)

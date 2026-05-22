@@ -95,7 +95,7 @@
           </v-col>
         </v-row>
 
-        <v-row v-if="isSVG" class="row-converter">
+        <v-row v-if="mode === 'LR'" class="row-converter">
           <v-col cols="16" lg="6">
             <p>
               Set, Max Size, if you want to reduce the image (the largest side will be reduced, the
@@ -108,6 +108,34 @@
               outlined
               @input="v$.maxSize.$touch()"
             />
+          </v-col>
+        </v-row>
+
+        <v-row class="row-converter" v-if="mode === 'LV'">
+          <v-col cols="16" lg="6">
+            <p>Height of the processing area</p>
+            <v-text-field
+              v-model="height"
+              :error-messages="heightErrors"
+              label="Height (mm)"
+              :rules="heightRules"
+              outlined
+              @input="v$.height.$touch()"
+            ></v-text-field>
+          </v-col>
+        </v-row>
+
+        <v-row class="row-converter" v-if="mode === 'LV'">
+          <v-col cols="16" lg="6">
+            <p>Width of the processing area</p>
+            <v-text-field
+              v-model="width"
+              :error-messages="widthErrors"
+              label="Width (mm)"
+              :rules="widthRules"
+              outlined
+              @input="v$.width.$touch()"
+            ></v-text-field>
           </v-col>
         </v-row>
 
@@ -359,6 +387,8 @@ const background = ref(false)
 const bgUserOverride = ref(false)
 const mode = ref('')
 const tracingMode = ref('')
+const height = ref('')
+const width = ref('')
 const laserPower = ref(80)
 const offsetX = ref('')
 const offsetY = ref('')
@@ -381,8 +411,8 @@ const ticksLabels = [
 ]
 
 const fileInputRules = [
-  (value) => !value || value.size <= 1024 * 1000 * 15 || 'Image size should be less than 15 MB!',
-  (value) => !value || value.size >= 1024 * 1 || 'Image size should be greater than 2 KB!',
+  (value) => !value || value.size <= 1024 * 1000 * 25 || 'Image size should be less than 25 MB!',
+  (value) => !value || value.size >= 1024 * 1 || 'Image size should be greater than 1 KB!',
   (value) =>
     !value ||
     value.type === 'image/svg+xml' ||
@@ -435,6 +465,10 @@ const offsetYRules = [
   (value) => !value || value >= 0 || 'Value should be 0 or greater than 0',
 ]
 
+const heightRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
+
+const widthRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
+
 const rules = {
   file: { required },
   feedSpeed: { numeric },
@@ -442,6 +476,14 @@ const rules = {
   passDepth: { numeric },
   passes: { numeric },
   maxSize: { numeric },
+  height: {
+    numeric,
+    heightWithWidth: (value) => (!!value && !!width.value) || (!value && !width.value),
+  },
+  width: {
+    numeric,
+    widthWithHeight: (value) => (!!value && !!height.value) || (!value && !height.value),
+  },
   tolerance: { decimal },
   mode: { required },
   tracingMode: {
@@ -460,6 +502,8 @@ const v$ = useVuelidate(rules, {
   passDepth,
   passes,
   maxSize,
+  height,
+  width,
   tolerance,
   mode,
   tracingMode,
@@ -508,6 +552,22 @@ const maxSizeErrors = computed(() => {
   const errors = []
   if (!v$.value.maxSize.$dirty) return errors
   if (!v$.value.maxSize.numeric) errors.push('Only numbers are allowed.')
+  return errors
+})
+
+const heightErrors = computed(() => {
+  const errors = []
+  if (!v$.value.height.$dirty) return errors
+  if (!v$.value.height.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.height.heightWithWidth) errors.push('Fill both height and width.')
+  return errors
+})
+
+const widthErrors = computed(() => {
+  const errors = []
+  if (!v$.value.width.$dirty) return errors
+  if (!v$.value.width.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.width.widthWithHeight) errors.push('Fill both height and width.')
   return errors
 })
 
@@ -649,6 +709,12 @@ const Converter = () => {
   }
   if (passes.value !== '') {
     formData.append('passes', passes.value)
+  }
+  if (height.value !== '') {
+    formData.append('height', height.value)
+  }
+  if (width.value !== '') {
+    formData.append('width', width.value)
   }
   if (file.value) {
     formData.append('file', file.value)
