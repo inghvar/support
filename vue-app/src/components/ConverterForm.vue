@@ -514,7 +514,7 @@ const heightErrors = computed(() => {
   const errors = []
   if (!v$.value.height.$dirty) return errors
   if (!v$.value.height.numeric) errors.push('Only numbers are allowed.')
-  if (!v$.value.height.heightWithWidth) errors.push('Fill both height and width.')
+  if (v$.value.height.heightWithWidth.$invalid) errors.push('Fill both height and width.')
   return errors
 })
 
@@ -522,7 +522,7 @@ const widthErrors = computed(() => {
   const errors = []
   if (!v$.value.width.$dirty) return errors
   if (!v$.value.width.numeric) errors.push('Only numbers are allowed.')
-  if (!v$.value.width.widthWithHeight) errors.push('Fill both height and width.')
+  if (v$.value.width.widthWithHeight.$invalid) errors.push('Fill both height and width.')
   return errors
 })
 
@@ -838,7 +838,7 @@ const getVectorized = async () => {
 }
 
 .row-converter {
-  margin-bottom: -20px;
+  margin-bottom: 8px;
 }
 
 .vectorized-title {
