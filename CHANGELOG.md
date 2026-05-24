@@ -1,3 +1,10 @@
+Version 0.2.0: May 24, 2026
+
+Enhancements
+- Add processing area width and height.
+- Refactoring
+
+
 Version 0.1.2: April 26, 2026
 
 Enhancements

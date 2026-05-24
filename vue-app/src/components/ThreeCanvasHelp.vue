@@ -155,8 +155,8 @@ export default {
 
       // ---------------------- inset arrow canvas ----------------------
 
-      var CANVAS_WIDTH = 300
-      var CANVAS_HEIGHT = 300
+      const CANVAS_WIDTH = 300
+      const CANVAS_HEIGHT = 300
       const arrowcanvReference = this.$refs.arrowCanvas
       this.arrowRenderer = new THREE.WebGLRenderer({
         alpha: true,
@@ -177,7 +177,7 @@ export default {
       this.arrowCamera.up = this.camera.up // important!
 
       const arrowPoint = new THREE.Vector3(0, 0, 0)
-      var xAxis = new THREE.ArrowHelper(
+      const xAxis = new THREE.ArrowHelper(
         new THREE.Vector3(1, 0, 0),
         arrowPoint,
         60,
@@ -185,7 +185,7 @@ export default {
         20,
         10
       )
-      var yAxis = new THREE.ArrowHelper(
+      const yAxis = new THREE.ArrowHelper(
         new THREE.Vector3(0, 1, 0),
         arrowPoint,
         60,
@@ -193,7 +193,7 @@ export default {
         20,
         10
       )
-      var zAxis = new THREE.ArrowHelper(
+      const zAxis = new THREE.ArrowHelper(
         new THREE.Vector3(0, 0, -1),
         arrowPoint,
         60,
@@ -248,7 +248,7 @@ export default {
           }
         } else {
           listPoints = this.pointsPath.curves[i].getPoints(19) // 20 points for circular interpolation
-          var listPointsToShow = this.pointsPath.curves[i].getPoints(1) // 2 points to show
+          const listPointsToShow = this.pointsPath.curves[i].getPoints(1) // 2 points to show
           for (j = 0; j < listPoints.length; j++) {
             // array of points to draw
             this.linearPoints.push(listPoints[j])
@@ -315,15 +315,15 @@ export default {
           // https://newbedev.com/finding-center-of-a-circle-given-two-points-and-radius
           // http://www.manufacturinget.org/2011/12/cnc-g-code-g02-and-g03/
           R = dataArc.R
-          var radsq = Math.pow(R, 2)
-          var q = Math.sqrt(
+          const radsq = Math.pow(R, 2)
+          const q = Math.sqrt(
             (dataArc.endPoint.x - dataArc.startPoint.x) *
             (dataArc.endPoint.x - dataArc.startPoint.x) +
             (dataArc.endPoint.z - dataArc.startPoint.z) *
             (dataArc.endPoint.z - dataArc.startPoint.z)
           )
-          var x3 = (dataArc.startPoint.x + dataArc.endPoint.x) / 2
-          var y3 = (dataArc.startPoint.z + dataArc.endPoint.z) / 2
+          const x3 = (dataArc.startPoint.x + dataArc.endPoint.x) / 2
+          const y3 = (dataArc.startPoint.z + dataArc.endPoint.z) / 2
 
           if (R > 0) {
             // first center point
@@ -350,11 +350,11 @@ export default {
         }
 
         // reduced values start point
-        var reducedStartPointX = dataArc.startPoint.x - centerX
-        var reducedStartPointZ = dataArc.startPoint.z - centerZ
+        const reducedStartPointX = dataArc.startPoint.x - centerX
+        const reducedStartPointZ = dataArc.startPoint.z - centerZ
         // reduced values end point
-        var reducedEndPointX = dataArc.endPoint.x - centerX
-        var reducedEndPointZ = dataArc.endPoint.z - centerZ
+        const reducedEndPointX = dataArc.endPoint.x - centerX
+        const reducedEndPointZ = dataArc.endPoint.z - centerZ
 
         // for check purpose
         // reducedEndPointX = R * Math.cos(this.toRadians(360))
@@ -362,9 +362,9 @@ export default {
 
         // definition betta ==> angle between axis X(10;0) and start point clockwise
         const TAU = this.toDegree(Math.PI * 2) // TAU = 360 grad
-        var det = 10 * reducedStartPointZ
-        var dot = 10 * reducedStartPointX
-        var betta = this.toDegree(Math.atan2(det, dot))
+        let det = 10 * reducedStartPointZ
+        let dot = 10 * reducedStartPointX
+        let betta = this.toDegree(Math.atan2(det, dot))
         // console.log(betta)
         if (betta < 0) {
           betta += TAU
@@ -379,13 +379,13 @@ export default {
         dot =
           reducedStartPointX * reducedEndPointX +
           reducedStartPointZ * reducedEndPointZ
-        var alpha = this.toDegree(Math.atan2(det, dot))
+        let alpha = this.toDegree(Math.atan2(det, dot))
         // console.log(alpha)
         if (alpha <= 0) {
           alpha += TAU
         }
         // console.log(alpha)
-        var curveMassive = []
+        const curveMassive = []
         // add to curve massive Start point
         curveMassive.push(
           new THREE.Vector3(
@@ -395,10 +395,10 @@ export default {
           )
         )
         // loop from Angle Start point to Angle End point
-        for (var k = betta; k < betta + alpha; k += 3) {
-          var x = centerX + R * Math.cos(this.toRadians(k))
-          var y = dataArc.startPoint.y
-          var z = centerZ + R * Math.sin(this.toRadians(k))
+        for (let k = betta; k < betta + alpha; k += 3) {
+          const x = centerX + R * Math.cos(this.toRadians(k))
+          const y = dataArc.startPoint.y
+          const z = centerZ + R * Math.sin(this.toRadians(k))
           curveMassive.push(new THREE.Vector3(x, y, z))
         }
         // add to curve massive End point
@@ -442,15 +442,15 @@ export default {
           var centerZ = dataArc.startPoint.z + dataArc.offset.z
         } else {
           R = dataArc.R
-          var radsq = Math.pow(R, 2)
-          var q = Math.sqrt(
+          const radsq = Math.pow(R, 2)
+          const q = Math.sqrt(
             (dataArc.endPoint.x - dataArc.startPoint.x) *
             (dataArc.endPoint.x - dataArc.startPoint.x) +
             (dataArc.endPoint.z - dataArc.startPoint.z) *
             (dataArc.endPoint.z - dataArc.startPoint.z)
           )
-          var x3 = (dataArc.startPoint.x + dataArc.endPoint.x) / 2
-          var y3 = (dataArc.startPoint.z + dataArc.endPoint.z) / 2
+          const x3 = (dataArc.startPoint.x + dataArc.endPoint.x) / 2
+          const y3 = (dataArc.startPoint.z + dataArc.endPoint.z) / 2
 
           if (R > 0) {
             centerX =
@@ -475,11 +475,11 @@ export default {
         }
 
         // reduced values start point
-        var reducedStartPointX = dataArc.startPoint.x - centerX
-        var reducedStartPointZ = dataArc.startPoint.z - centerZ
+        const reducedStartPointX = dataArc.startPoint.x - centerX
+        const reducedStartPointZ = dataArc.startPoint.z - centerZ
         // reduced values end point
-        var reducedEndPointX = dataArc.endPoint.x - centerX
-        var reducedEndPointZ = dataArc.endPoint.z - centerZ
+        const reducedEndPointX = dataArc.endPoint.x - centerX
+        const reducedEndPointZ = dataArc.endPoint.z - centerZ
 
         // for check purpose
         // reducedEndPointX = R * Math.cos(this.toRadians(360))
@@ -487,9 +487,9 @@ export default {
 
         // definition betta ==> angle between axis X(10;0) and start point counterclockwise
         const TAU = this.toDegree(Math.PI * 2) // TAU = 360 grad
-        var det = 10 * reducedStartPointZ
-        var dot = 10 * reducedStartPointX
-        var betta = this.toDegree(Math.atan2(det, dot))
+        let det = 10 * reducedStartPointZ
+        let dot = 10 * reducedStartPointX
+        let betta = this.toDegree(Math.atan2(det, dot))
         // console.log('betta')
         // console.log(betta)
         if (betta < 0) {
@@ -505,14 +505,14 @@ export default {
         dot =
           reducedStartPointX * reducedEndPointX +
           reducedStartPointZ * reducedEndPointZ
-        var alpha = this.toDegree(Math.atan2(det, dot))
+        let alpha = this.toDegree(Math.atan2(det, dot))
         // console.log('alpha')
         // console.log(alpha)
         if (alpha >= 0) {
           alpha -= TAU
         }
         // console.log(alpha)
-        var curveMassive = []
+        const curveMassive = []
         // add to curve massive Start point
         curveMassive.push(
           new THREE.Vector3(
@@ -522,10 +522,10 @@ export default {
           )
         )
         // loop from Angle Start point to Angle End point
-        for (var k = betta; k > betta - Math.abs(alpha); k -= 3) {
-          var x = centerX + R * Math.cos(this.toRadians(k))
-          var y = dataArc.startPoint.y
-          var z = centerZ + R * Math.sin(this.toRadians(k))
+        for (let k = betta; k > betta - Math.abs(alpha); k -= 3) {
+          const x = centerX + R * Math.cos(this.toRadians(k))
+          const y = dataArc.startPoint.y
+          const z = centerZ + R * Math.sin(this.toRadians(k))
           curveMassive.push(new THREE.Vector3(x, y, z))
         }
         // add to curve massive End point
@@ -570,7 +570,7 @@ export default {
     async longTask(i, model) {
       // console.log(i)
       // console.log(model)
-      var line = model
+      let line = model
       if (checkUsedGcode(line)) {
         // prepare line
         line = prepareGcode(line)
@@ -625,7 +625,7 @@ export default {
               this.coordinateZ
             )
             this.tmpEndVec.set(coordinates.x, coordinates.y, coordinates.z)
-            var curveLine = new THREE.LineCurve3(
+            const curveLine = new THREE.LineCurve3(
               this.tmpStartVec.clone(),
               this.tmpEndVec.clone()
             )
@@ -652,7 +652,7 @@ export default {
           this.modalGcodeMode === 'G3'
         ) {
           // console.log('work G02 G03')
-          var dataArc = circularInterpolation(
+          const dataArc = circularInterpolation(
             line,
             this.coordinateX,
             this.coordinateY,
