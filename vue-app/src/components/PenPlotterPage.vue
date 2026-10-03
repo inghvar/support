@@ -228,12 +228,14 @@
           Processing
         </v-btn>
 
-        <div class="response">
-          <p v-if="submitStatus === 'OK'">G-code generation completed successfully</p>
-          <p v-if="submitStatus === 'ERROR'">
+        <div class="response mt-4">
+          <v-alert v-if="submitStatus === 'OK'" type="success">
+            G-code generated successfully. You can download it.
+          </v-alert>
+          <v-alert v-if="submitStatus === 'ERROR'" type="error">
             {{ backendError }}
-          </p>
-          <p v-if="submitStatus === 'PENDING'">Processing ...</p>
+          </v-alert>
+          <v-alert v-if="submitStatus === 'PENDING'" type="info">Processing...</v-alert>
         </div>
       </v-form>
 
@@ -241,6 +243,7 @@
         :active="loadingProgressBar"
         :indeterminate="loadingProgressBar"
         color="#5AB55E"
+        class="mt-4"
       />
     </v-card-text>
   </v-card>
@@ -678,6 +681,11 @@ const submit = () => {
 
 .response {
   margin-top: 12px;
+}
+
+.response .v-alert {
+  padding: 8px 16px !important;
+  min-height: auto !important;
 }
 
 .converter-button {
