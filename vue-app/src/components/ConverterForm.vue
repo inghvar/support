@@ -4,7 +4,7 @@ F
   <v-card>
     <v-card-text>
       <p>Upload your image to convert it to G-code</p>
-      <p>Supported formats: PNG, JPEG, SVG</p>
+      <p>Supported formats: PNG, JPEG, SVG, DXF</p>
 
       <v-form ref="form" @submit.prevent="submit">
         <v-divider class="my-4"></v-divider>
@@ -26,13 +26,20 @@ F
             v-model="file"
             show-size
             counter
-            accept="image/png, image/jpeg, image/svg+xml"
+            accept="image/png, image/jpeg, image/svg+xml, .dxf"
             :rules="fileInputRules"
             :error-messages="v$.file.$errors.map((e) => e.$message)"
             label="Upload Image"
             @update:model-value="onFileChange"
           ></v-file-input>
         </div>
+
+        <!-- DXF Preview -->
+        <div
+          v-show="isDxf"
+          ref="dxfContainer"
+          class="dxf-preview"
+        ></div>
 
         <!-- Image Preview -->
         <div class="file-preview" v-if="imageUrl">
@@ -328,7 +335,8 @@ F
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { DxfViewer } from 'dxf-viewer'
 import axios from 'axios'
 import { useVuelidate } from '@vuelidate/core'
 import { required, numeric, decimal, requiredIf } from '@vuelidate/validators'
@@ -348,6 +356,9 @@ const props = defineProps({
 // Data
 const file = ref(null)
 const imageUrl = ref('')
+const isDxf = ref(false)
+const dxfContainer = ref(null)
+let dxfViewer = null
 const feedSpeed = ref('')
 const cuttingSpeed = ref('')
 const coordinateZ = ref('')
@@ -393,13 +404,16 @@ const ticksLabels = [
   'Extra Strong Filter',
 ]
 
+const isDxfFile = (value) => (value?.name || '').toLowerCase().endsWith('.dxf')
+
 // Validation Rules
 const fileInputRules = [
   (value) => !value || value.size <= 1024 * 1000 * 25 || 'Image size should be less than 25 MB',
   (value) => !value || value.size >= 1024 * 1 || 'Image size should be greater than 1 KB',
   (value) =>
     !value ||
-    ['image/svg+xml', 'image/jpeg', 'image/png'].includes(value.type) ||
+    ['image/svg+xml', 'image/jpeg', 'image/png', 'image/vnd.dxf'].includes(value.type) ||
+    isDxfFile(value) ||
     'This type of file not accepted',
 ]
 
@@ -553,10 +567,59 @@ const onBackgroundChange = () => {
   getVectorized()
 }
 
+const destroyDxfViewer = () => {
+  if (dxfViewer) {
+    dxfViewer.Destroy()
+    dxfViewer = null
+  }
+  if (dxfContainer.value) {
+    dxfContainer.value.innerHTML = ''
+  }
+}
+
+const showDxfPreview = async (dxfFile) => {
+  await nextTick()
+  const container = dxfContainer.value
+  if (!container) return
+
+  destroyDxfViewer()
+
+  const viewer = new DxfViewer(container, {
+    canvasWidth: container.clientWidth,
+    canvasHeight: 250,
+    autoResize: false,
+  })
+  dxfViewer = viewer
+
+  if (!viewer.HasRenderer()) return
+
+  const url = URL.createObjectURL(dxfFile)
+  try {
+    await viewer.Load({ url })
+  } catch (error) {
+    console.log('DXF preview failed:', error)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+onBeforeUnmount(destroyDxfViewer)
+
 const onFileChange = (newFile) => {
   if (!newFile) return
 
   file.value = newFile
+  isDxf.value = isDxfFile(newFile)
+
+  if (isDxf.value) {
+    isSVG.value = false
+    imageUrl.value = ''
+    backendError.value = ''
+    showDxfPreview(newFile)
+    return
+  }
+
+  destroyDxfViewer()
 
   if (newFile.type !== 'image/svg+xml') {
     isSVG.value = true
@@ -831,6 +894,13 @@ const getVectorized = async () => {
 
 .create-title {
   padding: 16px 0;
+}
+
+.dxf-preview {
+  width: 100%;
+  min-height: 250px;
+  border: 1px dashed #ccc;
+  margin-bottom: 16px;
 }
 
 .file-preview {
