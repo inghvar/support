@@ -46,7 +46,7 @@ F
         <!-- Vectorized Image Preview (for SVG engraving) -->
         <div v-if="isSVG && mode === 'ME' && tracingMode" class="my-4">
           <p class="vectorized-title">Check vectorized image:</p>
-          <div class="vectorized-image" v-html="fileURL"></div>
+          <div class="vectorized-image vectorized-preview" v-html="fileURL"></div>
         </div>
 
         <!-- Filter Slider (for SVG engraving) -->
@@ -853,6 +853,11 @@ const getVectorized = async () => {
   border: 1px solid #e0e0e0;
   padding: 8px;
   border-radius: 4px;
+}
+
+.vectorized-preview {
+  background: #fff;
+  padding: 8px;
 }
 
 .response {

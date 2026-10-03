@@ -43,7 +43,7 @@
               Check out the vectorized image. An Gcode will be generated from this image. Adjust the
               filter if necessary.
             </p>
-            <div class="vectorized-image" v-html="fileURL"></div>
+            <div class="vectorized-image vectorized-preview" v-html="fileURL"></div>
           </v-col>
         </v-row>
 
@@ -926,6 +926,11 @@ const submit = async () => {
 .vectorized-image {
   width: 100%;
   overflow: auto;
+}
+
+.vectorized-preview {
+  background: #fff;
+  padding: 8px;
 }
 
 .response {
