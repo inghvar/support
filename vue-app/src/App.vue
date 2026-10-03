@@ -65,12 +65,14 @@ import SettingsView from './views/SettingsView.vue'
 import LoginView from './components/LoginView.vue'
 import RegisterView from './components/RegisterView.vue'
 import LaserForm from './components/LaserPage.vue'
+import PenPlotterForm from './components/PenPlotterPage.vue'
 import { getAuth, onMessage, logout } from './vscodeApi'
 
 export default {
   components: {
     ConverterForm,
     LaserForm,
+    PenPlotterForm,
     SettingsView,
     LoginView,
     RegisterView
@@ -86,6 +88,7 @@ export default {
       user: null,
       menuItems: [
         { icon: 'mdi-saw-blade', text: 'Milling', value: 'milling' },
+        { icon: 'mdi-pen', text: 'Pen Plotter', value: 'penplotter' },
         { icon: 'mdi-laser-pointer', text: 'Laser', value: 'laser' },
         { icon: 'mdi-cog', text: 'Settings', value: 'settings' }
       ]
@@ -110,6 +113,7 @@ export default {
         return 'RegisterView'
       }
 
+      if (this.selectedView === 'penplotter') return 'PenPlotterForm'
       if (this.selectedView === 'laser') return 'LaserForm'
       if (this.selectedView === 'settings') return 'SettingsView'
 

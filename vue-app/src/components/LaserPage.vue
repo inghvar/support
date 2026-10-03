@@ -43,7 +43,7 @@
               Check out the vectorized image. An Gcode will be generated from this image. Adjust the
               filter if necessary.
             </p>
-            <div class="vectorized-image" v-html="fileURL"></div>
+            <div class="vectorized-image vectorized-preview" v-html="fileURL"></div>
           </v-col>
         </v-row>
 
@@ -288,12 +288,14 @@
           Processing
         </v-btn>
 
-        <div class="response">
-          <p v-if="submitStatus === 'OK'">G-code generation completed successfully</p>
-          <p v-if="submitStatus === 'ERROR'">
+        <div class="response mt-4">
+          <v-alert v-if="submitStatus === 'OK'" type="success">
+            G-code generated successfully. You can download it.
+          </v-alert>
+          <v-alert v-if="submitStatus === 'ERROR'" type="error">
             {{ backendError }}
-          </p>
-          <p v-if="submitStatus === 'PENDING'">Processing ...</p>
+          </v-alert>
+          <v-alert v-if="submitStatus === 'PENDING'" type="info">Processing...</v-alert>
         </div>
       </v-form>
 
@@ -301,6 +303,7 @@
         :active="loadingProgressBar"
         :indeterminate="loadingProgressBar"
         color="#5AB55E"
+        class="mt-4"
       />
     </v-card-text>
   </v-card>
@@ -329,10 +332,17 @@
     </v-card>
   </div>
 
-  <v-row v-if="mode === 'LR' && heightMapPreviewUrl" class="file-preview">
-    <div class="preview">Preview:</div>
-    <v-img :src="heightMapPreviewUrl" style="border: 1px dashed #ccc; min-height: 250px" />
-  </v-row>
+  <div v-if="mode === 'LR' && generatedGcodeText && submitStatus === 'OK'" class="mt-4">
+    <v-card>
+      <v-card-title class="d-flex align-center">
+        G-code Preview
+        <v-btn class="ml-4" color="primary" @click="onSaveClick">Save G-code</v-btn>
+      </v-card-title>
+      <v-card-text v-if="heightMapPreviewUrl">
+        <v-img :src="heightMapPreviewUrl" style="border: 1px dashed #ccc; min-height: 250px" />
+      </v-card-text>
+    </v-card>
+  </div>
 
   <v-dialog v-model="showConfirmDialogThree" max-width="500">
     <v-card>
@@ -348,7 +358,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import axios from 'axios'
 import { useVuelidate } from '@vuelidate/core'
 import { decimal, numeric, required, requiredIf } from '@vuelidate/validators'
@@ -398,6 +408,7 @@ const processingFrozen = ref(false)
 const showConfirmDialogThree = ref(false)
 const heightMapPreviewUrl = ref('')
 const filter = ref(0)
+const carvingStatus = ref('')
 
 let fileContent = ''
 let fileName = ''
@@ -760,7 +771,9 @@ const Converter = () => {
     },
   })
     .then((response) => {
-      if (response.status === 200) {
+      if (response.status === 202) {
+        checkRasterStatus(response.data.task_id)
+      } else if (response.status === 200) {
         let contentDisposition = response.headers['content-disposition'] || ''
         let parsedFileName = 'laser_output.nc'
 
@@ -880,6 +893,89 @@ const getVectorized = () => {
     })
 }
 
+let unmounted = false
+onBeforeUnmount(() => {
+  unmounted = true
+})
+
+const fetchRasterStatus = async (taskId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-status`, {
+      headers: { Authorization: `Token ${props.authToken}` },
+      params: { task_id: taskId },
+    })
+    carvingStatus.value = response.data?.status
+  } catch (error) {
+    backendError.value = error.response?.data || 'Error fetching status'
+    carvingStatus.value = 'FAILURE'
+  }
+}
+
+const loadRasterPreview = async (taskId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/converter/v2/get-laser-raster-preview`, {
+      headers: { Authorization: `Token ${props.authToken}` },
+      params: { task_id: taskId },
+      responseType: 'blob',
+    })
+    heightMapPreviewUrl.value = URL.createObjectURL(response.data)
+  } catch {
+    heightMapPreviewUrl.value = ''
+  }
+}
+
+const downloadRasterFile = async (taskId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/converter/v2/get-laser-raster`, {
+      headers: { Authorization: `Token ${props.authToken}` },
+      params: { task_id: taskId },
+    })
+
+    let contentDisposition = response.headers['content-disposition'] || ''
+    if (/=\?utf-8\?b\?/i.test(contentDisposition)) {
+      const b64 = contentDisposition.match(/=\?utf-8\?b\?(.*?)\?=/i)[1]
+      const decoded = atob(b64)
+      contentDisposition = new TextDecoder('utf-8').decode(
+        Uint8Array.from(decoded, (c) => c.charCodeAt(0)),
+      )
+    }
+
+    fileName = 'laser_raster.nc'
+    if (contentDisposition.includes(';') && contentDisposition.includes('=')) {
+      fileName = contentDisposition.split(';')[1].split('=')[1].replaceAll('"', '')
+    }
+
+    fileContent = response.data
+    generatedGcodeText.value = response.data
+    submitStatus.value = 'OK'
+
+    await loadRasterPreview(taskId)
+  } catch (error) {
+    backendError.value = error.response?.data || 'Error downloading file'
+    submitStatus.value = 'ERROR'
+  } finally {
+    loadingProgressBar.value = false
+    processingFrozen.value = false
+  }
+}
+
+const checkRasterStatus = async (taskId) => {
+  while (!unmounted) {
+    await fetchRasterStatus(taskId)
+
+    if (carvingStatus.value === 'SUCCESS') {
+      await downloadRasterFile(taskId)
+      break
+    } else if (carvingStatus.value === 'FAILURE') {
+      submitStatus.value = 'ERROR'
+      loadingProgressBar.value = false
+      processingFrozen.value = false
+      break
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10000))
+  }
+}
+
 const submit = async () => {
   showCanvas.value = false
   v$.value.$touch()
@@ -928,8 +1024,18 @@ const submit = async () => {
   overflow: auto;
 }
 
+.vectorized-preview {
+  background: #fff;
+  padding: 8px;
+}
+
 .response {
   margin-top: 12px;
+}
+
+.response .v-alert {
+  padding: 8px 16px !important;
+  min-height: auto !important;
 }
 
 .converter-button {

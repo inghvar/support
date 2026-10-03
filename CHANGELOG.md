@@ -1,3 +1,13 @@
+Version 0.3.0: October 3, 2026
+
+Enhancements
+- Add Pen Plotter page: create G-code from PNG, JPEG and SVG images for pen plotters.
+- Laser: Raster Engraving now works with the asynchronous backend (task status, preview and download).
+- Laser and Pen Plotter requests no longer require an authorization token.
+- Milling: add DXF support with a drawing preview.
+- Vectorized image preview is now shown on a white background and is visible in dark themes.
+
+
 Version 0.2.0: May 24, 2026
 
 Enhancements
