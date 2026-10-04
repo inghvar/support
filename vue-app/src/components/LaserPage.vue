@@ -370,8 +370,17 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 const props = defineProps({
   authToken: {
     type: String,
-    required: true,
+    default: '',
   },
+})
+
+const authHeaders = () => (props.authToken ? { Authorization: `Token ${props.authToken}` } : {})
+
+// Anonymous users poll and download raster results with a signed token issued by the backend
+const rasterTaskToken = ref('')
+const taskParams = (taskId) => ({
+  task_id: taskId,
+  ...(rasterTaskToken.value ? { token: rasterTaskToken.value } : {}),
 })
 
 const image = ref(undefined)
@@ -766,12 +775,13 @@ const Converter = () => {
     url,
     data: formData,
     headers: {
-      Authorization: `Token ${props.authToken}`,
+      ...authHeaders(),
       'Content-Type': 'multipart/form-data',
     },
   })
     .then((response) => {
       if (response.status === 202) {
+        rasterTaskToken.value = response.data.token || ''
         checkRasterStatus(response.data.task_id)
       } else if (response.status === 200) {
         let contentDisposition = response.headers['content-disposition'] || ''
@@ -857,13 +867,14 @@ const getVectorized = () => {
   if (tracingMode.value !== '') {
     formData.append('tracing_mode', tracingMode.value)
   }
+  formData.append('mode', mode.value)
 
   axios({
     method: 'post',
     url: `${API_BASE_URL}/api/converter/v1/get-vectorized`,
     data: formData,
     headers: {
-      Authorization: `Token ${props.authToken}`,
+      ...authHeaders(),
       'Content-Type': 'multipart/form-data',
     },
   })
@@ -901,8 +912,8 @@ onBeforeUnmount(() => {
 const fetchRasterStatus = async (taskId) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-status`, {
-      headers: { Authorization: `Token ${props.authToken}` },
-      params: { task_id: taskId },
+      headers: authHeaders(),
+      params: taskParams(taskId),
     })
     carvingStatus.value = response.data?.status
   } catch (error) {
@@ -914,8 +925,8 @@ const fetchRasterStatus = async (taskId) => {
 const loadRasterPreview = async (taskId) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/converter/v2/get-laser-raster-preview`, {
-      headers: { Authorization: `Token ${props.authToken}` },
-      params: { task_id: taskId },
+      headers: authHeaders(),
+      params: taskParams(taskId),
       responseType: 'blob',
     })
     heightMapPreviewUrl.value = URL.createObjectURL(response.data)
@@ -927,8 +938,8 @@ const loadRasterPreview = async (taskId) => {
 const downloadRasterFile = async (taskId) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/converter/v2/get-laser-raster`, {
-      headers: { Authorization: `Token ${props.authToken}` },
-      params: { task_id: taskId },
+      headers: authHeaders(),
+      params: taskParams(taskId),
     })
 
     let contentDisposition = response.headers['content-disposition'] || ''
@@ -989,6 +1000,7 @@ const submit = async () => {
   loadingProgressBar.value = true
   processingFrozen.value = true
   heightMapPreviewUrl.value = ''
+  rasterTaskToken.value = ''
 
   Converter()
 }

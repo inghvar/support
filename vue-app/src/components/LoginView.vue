@@ -1,6 +1,9 @@
 <template>
   <v-layout justify-center class="layout-down">
     <v-form @submit.prevent="submit" ref="formRef" lazy-validation class="wide-form">
+      <v-alert v-if="notice" type="info" variant="tonal" class="mb-4">
+        {{ notice }}
+      </v-alert>
       <v-row>
         <v-col cols="12">
           <h2 class="loginHeader">Login</h2>
@@ -63,6 +66,13 @@ const email = ref('')
 const password = ref('')
 const submitStatus = ref('')
 const backendError = ref('')
+
+defineProps({
+  notice: {
+    type: String,
+    default: '',
+  },
+})
 
 const emit = defineEmits(['change-view'])
 

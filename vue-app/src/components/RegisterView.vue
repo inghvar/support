@@ -1,6 +1,9 @@
 <template>
   <v-layout justify-center class="layout-down">
     <v-form @submit.prevent="submit" ref="formRef" lazy-validation class="wide-form">
+      <v-alert v-if="notice" type="info" variant="tonal" class="mb-4">
+        {{ notice }}
+      </v-alert>
 
       <v-row>
         <h2 class="createProfileHeader">Create Profile</h2>
@@ -109,6 +112,13 @@ import axios from 'axios'
 import { useVuelidate } from '@vuelidate/core'
 import { required, minLength, email, sameAs } from '@vuelidate/validators'
 import { saveAuth } from '../vscodeApi'
+
+defineProps({
+  notice: {
+    type: String,
+    default: '',
+  },
+})
 
 const formRef = ref(null)
 
