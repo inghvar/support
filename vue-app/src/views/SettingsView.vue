@@ -3,9 +3,9 @@
     <v-row>
       <v-col cols="12">
         <v-card>
-          <v-card-title>Settings</v-card-title>
+          <v-card-title>FAQ</v-card-title>
           <v-card-text>
-            <p>Settings page coming soon...</p>
+            <p>FAQ page coming soon...</p>
           </v-card-text>
         </v-card>
       </v-col>

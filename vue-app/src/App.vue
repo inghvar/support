@@ -1,6 +1,6 @@
 <template>
   <v-app id="inspire">
-    <v-navigation-drawer permanent app :width="200" v-if="isLoggedIn">
+    <v-navigation-drawer permanent app :width="200">
 
       <v-list>
         <v-list-item 
@@ -14,18 +14,8 @@
       </v-list>
     </v-navigation-drawer>
 
-    <v-app-bar app v-if="isLoggedIn">
-    <v-toolbar-title>
-      Toolpath Extension
-      <a
-        href="https://toolpath.tech"
-        target="_blank"
-        rel="noopener noreferrer"
-        style="margin-left: 12px;"
-      >
-        Go To Website
-      </a>
-    </v-toolbar-title>
+    <v-app-bar app>
+    <v-toolbar-title>Toolpath Extension</v-toolbar-title>
       <v-spacer></v-spacer>
 
       <span v-if="isLoggedIn && user" class="user-greeting">
@@ -37,6 +27,11 @@
         icon="mdi-logout"
         @click="logout"
       />
+
+      <template v-else>
+        <v-btn variant="text" @click="showAuth('login')">Login</v-btn>
+        <v-btn variant="text" @click="showAuth('register')">Register</v-btn>
+      </template>
     </v-app-bar>
 
     <v-main>
@@ -68,6 +63,11 @@ import LaserForm from './components/LaserPage.vue'
 import PenPlotterForm from './components/PenPlotterPage.vue'
 import { getAuth, onMessage, logout } from './vscodeApi'
 
+const AUTH_VIEWS = ['login', 'register']
+const PROTECTED_VIEWS = ['milling']
+const AUTH_NOTICE =
+  'These functions require registration. Please create a profile or log in to continue.'
+
 export default {
   components: {
     ConverterForm,
@@ -81,7 +81,9 @@ export default {
   data() {
     return {
       drawer: true,
-      selectedView: 'register',
+      selectedView: 'penplotter',
+      authNotice: '',
+      pendingView: null,
       isLoggedIn: false,
       isLoading: true,
       userToken: null,
@@ -90,7 +92,7 @@ export default {
         { icon: 'mdi-saw-blade', text: 'Milling', value: 'milling' },
         { icon: 'mdi-pen', text: 'Pen Plotter', value: 'penplotter' },
         { icon: 'mdi-laser-pointer', text: 'Laser', value: 'laser' },
-        { icon: 'mdi-cog', text: 'Settings', value: 'settings' }
+        { icon: 'mdi-help-circle', text: 'FAQ', value: 'settings' }
       ]
     }
   },
@@ -110,7 +112,12 @@ export default {
     currentViewComponent() {
       if (!this.isLoggedIn) {
         if (this.selectedView === 'login') return 'LoginView'
-        return 'RegisterView'
+        if (
+          this.selectedView === 'register' ||
+          PROTECTED_VIEWS.includes(this.selectedView)
+        ) {
+          return 'RegisterView'
+        }
       }
 
       if (this.selectedView === 'penplotter') return 'PenPlotterForm'
@@ -125,40 +132,72 @@ export default {
         return { 'auth-token': this.userToken }
       }
 
+      if (AUTH_VIEWS.includes(this.selectedView)) {
+        return { notice: this.authNotice }
+      }
+
       return {}
     }
   },
 
   methods: {
     changeView(view) {
+      if (!this.isLoggedIn && PROTECTED_VIEWS.includes(view)) {
+        this.pendingView = view
+        this.authNotice = AUTH_NOTICE
+        this.selectedView = 'register'
+        return
+      }
+
+      if (!AUTH_VIEWS.includes(view)) {
+        this.authNotice = ''
+        this.pendingView = null
+      }
+
+      this.selectedView = view
+    },
+
+    showAuth(view) {
+      this.authNotice = ''
+      this.pendingView = null
       this.selectedView = view
     },
 
     handleAuthMessage(data) {
       if (data.command === 'authData') {
+        const isFirstCheck = this.isLoading
         this.isLoading = false
+
         if (data.token && data.user) {
           this.isLoggedIn = true
           this.userToken = data.token
           this.user = data.user
+
+          if (isFirstCheck) {
+            this.selectedView = 'milling'
+          } else if (AUTH_VIEWS.includes(this.selectedView)) {
+            this.selectedView = this.pendingView || 'milling'
+          }
+          this.pendingView = null
+          this.authNotice = ''
         } else {
           this.isLoggedIn = false
           this.userToken = null
           this.user = null
-          this.selectedView = 'register'
         }
       }
 
       if (data.command === 'authSaved') {
         getAuth()
-        this.isLoggedIn = true
       }
 
       if (data.command === 'loggedOut') {
         this.isLoggedIn = false
         this.userToken = null
         this.user = null
-        this.selectedView = 'register'
+        this.authNotice = ''
+        this.pendingView = null
+        this.selectedView = 'penplotter'
       }
     },
     logout() {
