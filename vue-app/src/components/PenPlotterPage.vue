@@ -275,7 +275,7 @@ import axios from 'axios'
 import { useVuelidate } from '@vuelidate/core'
 import { decimal, numeric, required, requiredIf } from '@vuelidate/validators'
 import ThreeCanvasHelp from './ThreeCanvasHelp.vue'
-import { sendMessage } from '../vscodeApi'
+import { sendMessage, CLIENT_HEADERS } from '../vscodeApi'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 const LONG_GCODE_LINES = 50000
@@ -565,6 +565,7 @@ const Converter = () => {
     url: `${API_BASE_URL}/api/converter/v1/pen-plotter`,
     data: formData,
     headers: {
+      ...CLIENT_HEADERS,
       ...authHeaders(),
       'Content-Type': 'multipart/form-data',
     },

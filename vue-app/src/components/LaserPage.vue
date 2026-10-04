@@ -363,7 +363,7 @@ import axios from 'axios'
 import { useVuelidate } from '@vuelidate/core'
 import { decimal, numeric, required, requiredIf } from '@vuelidate/validators'
 import ThreeCanvasHelp from './ThreeCanvasHelp.vue'
-import { sendMessage } from '../vscodeApi'
+import { sendMessage, CLIENT_HEADERS } from '../vscodeApi'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -775,6 +775,7 @@ const Converter = () => {
     url,
     data: formData,
     headers: {
+      ...CLIENT_HEADERS,
       ...authHeaders(),
       'Content-Type': 'multipart/form-data',
     },

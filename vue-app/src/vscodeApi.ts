@@ -17,6 +17,9 @@ function getVscodeApi(): VsCodeApi | null {
   return null
 }
 
+// Marks requests that create G-code so the backend can tell the extension from the website
+export const CLIENT_HEADERS = { 'X-Client': 'vscode-extension' }
+
 const vscode = getVscodeApi()
 
 export function sendMessage(command: string, data?: any) {
