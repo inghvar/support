@@ -169,7 +169,7 @@ F
 
           <v-text-field
             v-model.number="stepover"
-            label="Stepover between passes (default 0.3 mm)"
+            label="Horizontal step when moving in a serpentine pattern (default 0.3 mm)"
             :rules="stepoverRules"
             type="number"
             variant="outlined"
