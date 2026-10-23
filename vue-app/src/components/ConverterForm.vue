@@ -1,7 +1,7 @@
 F
 <template>
   <h2 class="create-title">G-code generation for milling</h2>
-  <v-card>
+  <v-card class="tool-card" elevation="3">
     <v-card-text>
       <p>Upload your image to convert it to G-code</p>
       <p>Supported formats: PNG, JPEG, SVG, DXF</p>
@@ -273,19 +273,19 @@ F
         ></v-textarea>
 
         <!-- Submit Button -->
-        <v-btn type="submit" color="success" size="large" :disabled="processingFrozen" class="mt-4">
+        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen" class="mt-4">
           Process Image
         </v-btn>
 
         <!-- Response Messages -->
         <div class="response mt-4">
-          <v-alert v-if="submitStatus === 'OK'" type="success">
+          <v-alert v-if="submitStatus === 'OK'" type="success" variant="tonal" density="compact">
             G-code generated successfully. You can download it.
           </v-alert>
-          <v-alert v-if="submitStatus === 'ERROR'" type="error">
+          <v-alert v-if="submitStatus === 'ERROR'" type="error" variant="tonal" density="compact">
             {{ backendError }}
           </v-alert>
-          <v-alert v-if="submitStatus === 'PENDING'" type="info">
+          <v-alert v-if="submitStatus === 'PENDING'" type="info" variant="tonal" density="compact">
             <span v-if="mode === 'ME'">Processing...</span>
             <span v-else>Processing may take a few minutes...</span>
           </v-alert>

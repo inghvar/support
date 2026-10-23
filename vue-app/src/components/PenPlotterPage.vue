@@ -1,7 +1,7 @@
 <template>
   <h2 class="create-title">Create G-code from an Image for Pen Plotter</h2>
 
-  <v-card>
+  <v-card class="tool-card" elevation="3">
     <v-card-text>
       <p>
         Set the characteristics and upload the image, for empty fields will be used default values
@@ -222,6 +222,8 @@
         <v-btn
           class="mr-4 converter-button"
           color="success"
+          size="large"
+          variant="flat"
           :disabled="processingFrozen"
           type="submit"
         >
@@ -229,13 +231,13 @@
         </v-btn>
 
         <div class="response mt-4">
-          <v-alert v-if="submitStatus === 'OK'" type="success">
+          <v-alert v-if="submitStatus === 'OK'" type="success" variant="tonal" density="compact">
             G-code generated successfully. You can download it.
           </v-alert>
-          <v-alert v-if="submitStatus === 'ERROR'" type="error">
+          <v-alert v-if="submitStatus === 'ERROR'" type="error" variant="tonal" density="compact">
             {{ backendError }}
           </v-alert>
-          <v-alert v-if="submitStatus === 'PENDING'" type="info">Processing...</v-alert>
+          <v-alert v-if="submitStatus === 'PENDING'" type="info" variant="tonal" density="compact">Processing...</v-alert>
         </div>
       </v-form>
 

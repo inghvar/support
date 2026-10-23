@@ -1,0 +1,25 @@
+.create-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.tool-card {
+  border-radius: 12px;
+}
+
+.tool-card > .v-card-text {
+  padding: 24px 32px 32px;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-size: 0.9rem;
+}
+
+.file-preview .v-img {
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.row-converter p {
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: rgba(var(--v-theme-on-surface), 0.8);
+}
