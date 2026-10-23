@@ -1,3 +1,10 @@
+Version 0.4.0: October 23, 2026
+
+Enhancements
+- New design of the login, registration and tool pages.
+- Milling, Carving: 3D preview of the finished part, new processing parameters and ready G-code file links.
+
+
 Version 0.3.1: October 4, 2026
 
 Enhancements

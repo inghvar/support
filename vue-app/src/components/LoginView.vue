@@ -1,56 +1,84 @@
 <template>
-  <v-layout justify-center class="layout-down">
-    <v-form @submit.prevent="submit" ref="formRef" lazy-validation class="wide-form">
-      <v-alert v-if="notice" type="info" variant="tonal" class="mb-4">
-        {{ notice }}
-      </v-alert>
-      <v-row>
-        <v-col cols="12">
-          <h2 class="loginHeader">Login</h2>
-          <v-text-field
-            v-model="email"
-            :error-messages="emailErrors"
-            label="Email*"
-            required
-            @input="v$.email.$touch()"
-          ></v-text-field>
-        </v-col>
-      </v-row>
+  <v-container class="login-page">
+    <v-row justify="center">
+      <v-col cols="12" sm="10" md="8" lg="6" xl="5">
+        <v-card class="login-card pa-4 pa-sm-8" elevation="3">
+          <v-alert v-if="notice" type="info" variant="tonal" class="mb-4">
+            {{ notice }}
+          </v-alert>
 
-      <v-row>
-        <v-col cols="12">
-          <v-text-field
-            v-model="password"
-            :error-messages="passwordErrors"
-            label="Password*"
-            type="password"
-            required
-            @input="v$.password.$touch()"
-          ></v-text-field>
-        </v-col>
-      </v-row>
+          <h1 class="login-title">Welcome back</h1>
+          <p class="login-subtitle">Log in to your toolpath.tech account</p>
 
-      <v-row>
-        <v-col cols="12">
-          <v-btn color="success" block type="submit">
-            Login
-          </v-btn>
-        </v-col>
-      </v-row>
+          <v-form @submit.prevent="submit" ref="formRef" lazy-validation>
+            <v-text-field
+              v-model="email"
+              :error-messages="emailErrors"
+              label="Email"
+              type="email"
+              autocomplete="email"
+              prepend-inner-icon="mdi-email-outline"
+              required
+              variant="outlined"
+              @input="v$.email.$touch()"
+              @blur="v$.email.$touch()"
+            ></v-text-field>
 
-      <div class="response">
-        <p v-if="submitStatus === 'OK'">You're now logged in!</p>
-        <p v-if="submitStatus === 'ERROR'">
-          Please fill the form correctly. {{ backendError }}
-        </p>
-        <p v-if="submitStatus === 'PENDING'">Sending...</p>
-      </div>
-      <div class="register-link">
-        Don’t have an account?
-        <a href="#" @click.prevent="emit('change-view', 'register')">Register</a>
-      </div>
-    </v-form>
-  </v-layout>
+            <v-text-field
+              v-model="password"
+              :error-messages="passwordErrors"
+              label="Password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              prepend-inner-icon="mdi-lock-outline"
+              :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+              required
+              variant="outlined"
+              @click:append-inner="showPassword = !showPassword"
+              @input="v$.password.$touch()"
+              @blur="v$.password.$touch()"
+            ></v-text-field>
+
+            <v-btn
+              type="submit"
+              color="success"
+              size="large"
+              block
+              variant="flat"
+              :loading="submitStatus === 'PENDING'"
+              :disabled="submitStatus === 'PENDING'"
+            >
+              Login
+            </v-btn>
+
+            <v-alert
+              v-if="submitStatus === 'OK'"
+              type="success"
+              variant="tonal"
+              density="compact"
+              class="mt-4 mb-0"
+            >
+              You're now logged in!
+            </v-alert>
+            <v-alert
+              v-if="submitStatus === 'ERROR'"
+              type="error"
+              variant="tonal"
+              density="compact"
+              class="mt-4 mb-0"
+            >
+              Please fill the form correctly. {{ backendError }}
+            </v-alert>
+          </v-form>
+
+          <div class="register-link">
+            Don’t have an account?
+            <a href="#" @click.prevent="emit('change-view', 'register')">Register</a>
+          </div>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script setup>
@@ -66,6 +94,7 @@ const email = ref('')
 const password = ref('')
 const submitStatus = ref('')
 const backendError = ref('')
+const showPassword = ref(false)
 
 defineProps({
   notice: {
@@ -154,62 +183,30 @@ onMounted(() => {
 })
 </script>
 
-<style>
-.response {
-  padding-top: 10px;
-  color: red;
-}
-.button-social {
-  padding-top: 20px;
-}
-.loginHeader {
-  padding-bottom: 22px;
+<style scoped>
+.login-page {
+  padding-top: 40px;
+  padding-bottom: 40px;
 }
 
-.wide-form {
-  width: 40%;
-  max-width: 500px;
-  margin: 0 auto;
+.login-card {
+  border-radius: 12px;
 }
 
-.layout-down {
-  margin-top: 40px;
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
-.divider-or {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 10px 0;
-  color: #777;
-}
-
-.divider-or::before,
-.divider-or::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #ccc;
-}
-
-.divider-or::before {
-  margin-right: 10px;
-}
-
-.divider-or::after {
-  margin-left: 10px;
-}
-
-.terms {
-  padding-top: 4px;
-  font-size: 14px;
-}
-.button-facebook {
-  font-size: 14px;
+.login-subtitle {
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  margin-bottom: 28px;
 }
 
 .register-link {
-  margin-top: 16px;
+  margin-top: 24px;
   text-align: center;
-  font-size: 16px;
+  font-size: 0.875rem;
 }
 </style>

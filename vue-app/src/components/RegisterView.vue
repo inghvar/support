@@ -1,109 +1,151 @@
 <template>
-  <v-layout justify-center class="layout-down">
-    <v-form @submit.prevent="submit" ref="formRef" lazy-validation class="wide-form">
-      <v-alert v-if="notice" type="info" variant="tonal" class="mb-4">
-        {{ notice }}
-      </v-alert>
+  <v-container class="register-page">
+    <v-row justify="center">
+      <v-col cols="12" sm="10" md="8" lg="6" xl="5">
+        <v-card class="register-card pa-4 pa-sm-8" elevation="3">
+          <v-alert v-if="notice" type="info" variant="tonal" class="mb-4">
+            {{ notice }}
+          </v-alert>
 
-      <v-row>
-        <h2 class="createProfileHeader">Create Profile</h2>
-        <v-col cols="12">
-          <v-text-field
-            v-model="emailValue"
-            :error-messages="emailErrors"
-            label="Email*"
-            required
-            @input="v$.email.$touch()"
-          />
-        </v-col>
-      </v-row>
+          <h1 class="register-title">Create profile</h1>
+          <p class="register-subtitle">Sign up to start using toolpath.tech</p>
 
-      <v-row>
-        <v-col cols="12">
-          <v-text-field
-            v-model="password"
-            :error-messages="passwordErrors"
-            label="Password*"
-            type="password"
-            required
-            @input="v$.password.$touch()"
-          />
-        </v-col>
-      </v-row>
+          <v-form @submit.prevent="submit" ref="formRef" lazy-validation>
+            <v-text-field
+              v-model="emailValue"
+              :error-messages="emailErrors"
+              label="Email"
+              type="email"
+              autocomplete="email"
+              prepend-inner-icon="mdi-email-outline"
+              required
+              variant="outlined"
+              @input="v$.email.$touch()"
+              @blur="v$.email.$touch()"
+            />
 
-      <v-row>
-        <v-col cols="12">
-          <v-text-field
-            v-model="repeatPassword"
-            :error-messages="repeatPasswordErrors"
-            label="Repeat Password*"
-            type="password"
-            required
-            @input="v$.repeatPassword.$touch()"
-          />
-        </v-col>
-      </v-row>
+            <v-row dense>
+              <v-col cols="12" sm="6">
+                <v-text-field
+                  v-model="first_name"
+                  :error-messages="firstNameErrors"
+                  label="First name"
+                  autocomplete="given-name"
+                  prepend-inner-icon="mdi-account-outline"
+                  required
+                  variant="outlined"
+                  @input="v$.first_name.$touch()"
+                  @blur="v$.first_name.$touch()"
+                />
+              </v-col>
+              <v-col cols="12" sm="6">
+                <v-text-field
+                  v-model="last_name"
+                  :error-messages="lastNameErrors"
+                  label="Last name"
+                  autocomplete="family-name"
+                  prepend-inner-icon="mdi-account-outline"
+                  required
+                  variant="outlined"
+                  @input="v$.last_name.$touch()"
+                  @blur="v$.last_name.$touch()"
+                />
+              </v-col>
+            </v-row>
 
-      <v-row>
-        <v-col cols="12">
-          <v-text-field
-            v-model="first_name"
-            :error-messages="firstNameErrors"
-            label="First Name*"
-            required
-            @input="v$.first_name.$touch()"
-          />
-        </v-col>
-      </v-row>
+            <v-text-field
+              v-model="password"
+              :error-messages="passwordErrors"
+              label="Password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="new-password"
+              prepend-inner-icon="mdi-lock-outline"
+              :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+              required
+              variant="outlined"
+              @click:append-inner="showPassword = !showPassword"
+              @input="v$.password.$touch()"
+              @blur="v$.password.$touch()"
+            />
 
-      <v-row>
-        <v-col cols="12">
-          <v-text-field
-            v-model="last_name"
-            :error-messages="lastNameErrors"
-            label="Last Name*"
-            required
-            @input="v$.last_name.$touch()"
-          />
-        </v-col>
-      </v-row>
+            <v-text-field
+              v-model="repeatPassword"
+              :error-messages="repeatPasswordErrors"
+              label="Repeat password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="new-password"
+              prepend-inner-icon="mdi-lock-check-outline"
+              required
+              variant="outlined"
+              @input="v$.repeatPassword.$touch()"
+              @blur="v$.repeatPassword.$touch()"
+            />
 
-      <v-row>
-        <v-col cols="12">
-          <input type="checkbox" v-model="checked" />
-          I agree with
-          <a href="https://toolpath.tech/terms" target="_blank">Terms</a>
-        </v-col>
-      </v-row>
+            <v-checkbox
+              v-model="checked"
+              :error="submitStatus === 'TERMS'"
+              hide-details
+            >
+              <template #label>
+                <span>
+                  I agree with
+                  <a href="https://toolpath.tech/terms" target="_blank" @click.stop>Terms of Use</a>
+                </span>
+              </template>
+            </v-checkbox>
 
-      <v-btn
-        class="create-button"
-        color="success"
-        block
-        type="submit"
-        :disabled="submitStatus === 'PENDING'"
-      >
-        Create
-      </v-btn>
+            <v-btn
+              type="submit"
+              color="success"
+              size="large"
+              block
+              variant="flat"
+              class="mt-6"
+              :loading="submitStatus === 'PENDING'"
+              :disabled="submitStatus === 'PENDING'"
+            >
+              Create
+            </v-btn>
 
-      <div class="login-link">
-        Already have an account?
-        <a href="#" @click.prevent="$emit('change-view', 'login')">
-          Log in here
-        </a>
-      </div>
+            <v-alert
+              v-if="submitStatus === 'TERMS'"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mt-4 mb-0"
+            >
+              You must accept "Terms of Use"
+            </v-alert>
+            <v-alert
+              v-if="submitStatus === 'OK'"
+              type="success"
+              variant="tonal"
+              density="compact"
+              class="mt-4 mb-0"
+            >
+              Account created
+            </v-alert>
+            <v-alert
+              v-if="submitStatus === 'ERROR'"
+              type="error"
+              variant="tonal"
+              density="compact"
+              class="mt-4 mb-0"
+            >
+              Please fill the form correctly. {{ backendError }}
+            </v-alert>
+          </v-form>
 
-      <div class="response">
-        <p v-if="submitStatus === 'TERMS'">You must accept Terms</p>
-        <p v-if="submitStatus === 'OK'">Account created</p>
-        <p v-if="submitStatus === 'ERROR'">
-          Please fill the form correctly. {{ backendError }}
-        </p>
-        <p v-if="submitStatus === 'PENDING'">Sending...</p>
-      </div>
-
-    </v-form>
-  </v-layout>
+          <div class="login-link">
+            Already have an account?
+            <a href="#" @click.prevent="$emit('change-view', 'login')">
+              Log in here
+            </a>
+          </div>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script setup>
@@ -128,6 +170,7 @@ const repeatPassword = ref('')
 const first_name = ref('')
 const last_name = ref('')
 const checked = ref(false)
+const showPassword = ref(false)
 
 const submitStatus = ref('')
 const backendError = ref('')
@@ -236,42 +279,30 @@ function submit() {
 }
 </script>
 
-<style>
-.response {
-  padding-top: 10px;
-  color: red;
+<style scoped>
+.register-page {
+  padding-top: 40px;
+  padding-bottom: 40px;
 }
 
-.createProfileHeader {
-  padding-left: 10px;
-  padding-top: 20px;
-  margin-bottom: 20px;
+.register-card {
+  border-radius: 12px;
 }
 
-.wide-form {
-  width: 40%;
-  max-width: 500px;
-  margin: 0 auto;
+.register-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
-.layout-down {
-  margin-top: 40px;
+.register-subtitle {
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  margin-bottom: 28px;
 }
 
 .login-link {
-  margin-top: 20px;
+  margin-top: 24px;
   text-align: center;
-  font-size: 16px;
-}
-
-.login-link a {
-  color: #1976d2;
-  font-weight: bold;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.create-button {
-  margin-top: 22px;
+  font-size: 0.875rem;
 }
 </style>

@@ -1,7 +1,7 @@
 F
 <template>
   <h2 class="create-title">G-code generation for milling</h2>
-  <v-card>
+  <v-card class="tool-card" elevation="3">
     <v-card-text>
       <p>Upload your image to convert it to G-code</p>
       <p>Supported formats: PNG, JPEG, SVG, DXF</p>
@@ -100,12 +100,59 @@ F
 
         <!-- Carving Parameters -->
         <template v-if="mode === 'MC'">
+          <p class="radio-title">Processing type (choose one):</p>
+          <v-radio-group
+            v-model="carvingStage"
+            hint='Flat figures (line drawings, "pillows") are always processed as finish only, even if "Rough + finish" is selected.'
+            persistent-hint
+            :error-messages="v$.carvingStage.$errors.map(() => 'Choose the processing type')"
+            @update:model-value="v$.carvingStage.$touch()"
+          >
+            <v-radio label="Finish only (takes longer)" value="finish"></v-radio>
+            <v-radio label="Rough + finish" value="rough_finish"></v-radio>
+          </v-radio-group>
+        </template>
+
+        <template v-if="carvingFieldsVisible">
           <v-text-field
             v-model.number="workpieceThickness"
             :error-messages="v$.workpieceThickness.$errors.map((e) => e.$message)"
             label="Workpiece Thickness (mm)"
             :rules="workpieceThicknessRules"
+            :error="!!reliefHeightError"
             type="number"
+            variant="outlined"
+            class="my-2"
+            @update:model-value="reliefTouched = true"
+          ></v-text-field>
+
+          <v-text-field
+            v-model="reliefHeight"
+            label="Relief height, mm (default 8 mm)"
+            hint="Not used for flat figures (drawings): their relief height is fixed."
+            :error-messages="reliefHeightError"
+            persistent-hint
+            variant="outlined"
+            class="my-2"
+            @update:model-value="reliefTouched = true"
+          ></v-text-field>
+
+          <v-text-field
+            v-model="safeHeight"
+            label="Safe height Z, mm (default: thickness + 5 mm)"
+            hint="Height above the table the tool retracts to between passes and at the end. Must be greater than the workpiece thickness."
+            :error-messages="safeHeightProblem"
+            persistent-hint
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+
+          <v-text-field
+            v-model="platformCut"
+            label="Platform cut, % (0 - as is)"
+            hint="The higher it is, the lower the platform under the figure and the higher the figure itself (face, folds); the deepest hollows are flattened to the background. Not used for flat figures."
+            :error-messages="platformCutProblem"
+            persistent-hint
             variant="outlined"
             class="my-2"
           ></v-text-field>
@@ -120,6 +167,51 @@ F
             class="my-2"
           ></v-text-field>
 
+          <v-text-field
+            v-model.number="stepover"
+            label="Horizontal step when moving in a serpentine pattern (default 0.3 mm)"
+            :rules="stepoverRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+
+          <template v-if="carvingStage === 'rough_finish'">
+            <v-select
+              v-model="roughToolType"
+              :items="toolTypeItems"
+              label="Rough tool: type"
+              variant="outlined"
+              class="my-2"
+            ></v-select>
+
+            <v-text-field
+              v-model.number="roughToolDiameter"
+              label="Rough tool: diameter (mm)"
+              :rules="toolDiameterRules"
+              type="number"
+              variant="outlined"
+              class="my-2"
+            ></v-text-field>
+          </template>
+
+          <v-select
+            v-model="toolType"
+            :items="toolTypeItems"
+            :label="carvingStage === 'rough_finish' ? 'Finish tool: type' : 'Tool type'"
+            variant="outlined"
+            class="my-2"
+          ></v-select>
+
+          <v-text-field
+            v-model.number="toolDiameter"
+            :label="carvingStage === 'rough_finish' ? 'Finish tool: diameter (mm)' : 'Tool diameter (default 3 mm)'"
+            :rules="toolDiameterRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+
           <v-select
             v-model="typeProcessing"
             :items="['out', 'in']"
@@ -127,14 +219,21 @@ F
             variant="outlined"
             class="my-2"
           ></v-select>
+          <v-checkbox
+            v-if="typeProcessing === 'in'"
+            v-model="mirror"
+            label="Mirror image"
+            hint="For casting from the matrix: a cast is the mirror image of the matrix, so the picture is flipped horizontally"
+            persistent-hint
+          ></v-checkbox>
         </template>
 
         <!-- Max Size -->
-        <div class="row-converter" v-if="mode === 'MC'">
+        <div class="row-converter" v-if="carvingFieldsVisible">
           <p>Set, Max Size, if you want to reduce the image (the largest side will be</p>
           <p>reduced, the smallest side proportionally)</p>
           <v-text-field
-            v-if="mode === 'MC'"
+            v-if="carvingFieldsVisible"
             v-model.number="maxSize"
             :error-messages="v$.maxSize.$errors.map((e) => e.$message)"
             label="Max Size (in pixel)"
@@ -273,19 +372,34 @@ F
         ></v-textarea>
 
         <!-- Submit Button -->
-        <v-btn type="submit" color="success" size="large" :disabled="processingFrozen" class="mt-4">
+        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen || !!reliefHeightProblem || !!platformCutProblem || !!safeHeightProblem" class="mt-4">
           Process Image
         </v-btn>
 
         <!-- Response Messages -->
         <div class="response mt-4">
-          <v-alert v-if="submitStatus === 'OK'" type="success">
+          <v-alert
+            v-if="submitStatus === 'OK' && mode === 'MC'"
+            type="success"
+            variant="tonal"
+            density="compact"
+          >
+            <p class="mb-2">
+              {{ carvingFiles.length > 1 ? 'Two files are ready. Run the rough one first, then the finish one. Do not move the workpiece between them and set Z again for the finish tool:' : 'The G-code file is ready:' }}
+            </p>
+            <ul class="mb-0">
+              <li v-for="carvingFile in carvingFiles" :key="carvingFile.id">
+                <a href="#" @click.prevent="downloadCarvingFile(carvingFile)">{{ carvingFile.name }}.nc</a>
+              </li>
+            </ul>
+          </v-alert>
+          <v-alert v-if="submitStatus === 'OK' && mode !== 'MC'" type="success" variant="tonal" density="compact">
             G-code generated successfully. You can download it.
           </v-alert>
-          <v-alert v-if="submitStatus === 'ERROR'" type="error">
+          <v-alert v-if="submitStatus === 'ERROR'" type="error" variant="tonal" density="compact">
             {{ backendError }}
           </v-alert>
-          <v-alert v-if="submitStatus === 'PENDING'" type="info">
+          <v-alert v-if="submitStatus === 'PENDING'" type="info" variant="tonal" density="compact">
             <span v-if="mode === 'ME'">Processing...</span>
             <span v-else>Processing may take a few minutes...</span>
           </v-alert>
@@ -318,7 +432,7 @@ F
         G-code Preview
 
         <v-btn
-          v-if="generatedGcodeText"
+          v-if="generatedGcodeText && mode !== 'MC'"
           class="ml-4"
           color="primary"
           :disabled="processingFrozen"
@@ -328,7 +442,7 @@ F
         </v-btn>
       </v-card-title>
       <v-card-text>
-        <ThreeCanvasHelp :gcode-source="generatedGcodeText" />
+        <ThreeCanvasHelp :gcode-source="generatedGcodeText" :carving-preview="carvingPreview" />
       </v-card-text>
     </v-card>
   </div>
@@ -365,7 +479,27 @@ const coordinateZ = ref('')
 const cuttingDepth = ref('')
 const workpieceThickness = ref('')
 const stepDepth = ref('')
+const reliefHeight = ref('')
+const platformCut = ref('')
+const carvingStage = ref('')
+const roughToolType = ref('flat')
+const roughToolDiameter = ref('')
+const carvingFiles = ref([])
+const safeHeight = ref('')
+const reliefTouched = ref(false)
+const mirror = ref(false)
 const typeProcessing = ref('out')
+const stepover = ref('')
+const toolType = ref('flat')
+const toolDiameter = ref('')
+const carvingPreview = ref(null)
+const DEFAULT_RELIEF_HEIGHT = 8 // mm, fits the default thickness of 10 mm
+const MAX_PLATFORM_CUT = 90 // percent, the same limit as on the server
+const MIN_BOTTOM_THICKNESS = 2 // mm of material that must stay above the table
+const toolTypeItems = [
+  { title: 'Flat end mill', value: 'flat' },
+  { title: 'Ball end mill', value: 'ball' },
+]
 const header = ref('G17\nG90\nG0 X0 Y0\nM3 S800')
 const end = ref('M5')
 const submitStatus = ref('')
@@ -438,6 +572,14 @@ const workpieceThicknessRules = [
 
 const stepDepthRules = [(value) => !value || value > 0 || 'Value should be greater than 0']
 
+const stepoverRules = [
+  (value) => !value || (value >= 0.1 && value <= 5) || 'Value should be between 0.1 and 5',
+]
+
+const toolDiameterRules = [
+  (value) => !value || (value >= 0.1 && value <= 25) || 'Value should be between 0.1 and 25',
+]
+
 const passDepthRules = [
   (value) => !value || value < 15 || 'Value should be less than 15 mm',
   (value) => !value || value > 0 || 'Value should be greater than 0',
@@ -475,6 +617,9 @@ const rules = {
   },
   tolerance: { decimal },
   mode: { required },
+  carvingStage: {
+    required: requiredIf(() => mode.value === 'MC'),
+  },
   tracingMode: {
     required: requiredIf(() => mode.value === 'ME' && isSVG.value === true),
   },
@@ -497,6 +642,7 @@ const v$ = useVuelidate(rules, {
   width,
   tolerance,
   mode,
+  carvingStage,
   tracingMode,
   header,
   end,
@@ -507,6 +653,41 @@ const v$ = useVuelidate(rules, {
 })
 
 // Computed
+const carvingFieldsVisible = computed(() => mode.value === 'MC' && carvingStage.value !== '')
+
+const safeHeightProblem = computed(() => {
+  if (safeHeight.value === '') return ''
+  const value = Number(safeHeight.value)
+  const thickness = parseFloat(workpieceThickness.value)
+  if (isNaN(value) || (!isNaN(thickness) && value <= thickness)) {
+    return 'Safe height must be a number greater than the workpiece thickness.'
+  }
+  return ''
+})
+
+const platformCutProblem = computed(() => {
+  if (platformCut.value === '') return ''
+  const value = Number(platformCut.value)
+  if (isNaN(value) || value < 0 || value > MAX_PLATFORM_CUT) {
+    return `Platform cut must be a number from 0 to ${MAX_PLATFORM_CUT}.`
+  }
+  return ''
+})
+
+const reliefHeightProblem = computed(() => {
+  if (mode.value !== 'MC') return ''
+  const thickness = workpieceThickness.value === '' ? 10 : parseFloat(workpieceThickness.value)
+  const height = reliefHeight.value === '' ? DEFAULT_RELIEF_HEIGHT : parseFloat(reliefHeight.value)
+  if (isNaN(thickness) || isNaN(height)) return ''
+  if (height <= 0) return 'Relief height must be greater than 0.'
+  const left = thickness - height
+  if (left >= MIN_BOTTOM_THICKNESS) return ''
+  const maxHeight = Math.round((thickness - MIN_BOTTOM_THICKNESS) * 10) / 10
+  return `Dangerous distance to the bottom of the workpiece: only ${Math.round(left * 10) / 10} mm would remain under the relief, at least ${MIN_BOTTOM_THICKNESS} mm is required. Reduce the relief height (at most ${maxHeight} mm) or increase the workpiece thickness.`
+})
+
+const reliefHeightError = computed(() => (reliefTouched.value ? reliefHeightProblem.value : ''))
+
 const cuttingDepthWarnings = computed(() => {
   if (passes.value === '' || passDepth.value === '' || cuttingDepth.value === '') {
     return []
@@ -658,7 +839,50 @@ const fetchCarvingStatus = async (taskId) => {
   }
 }
 
+const fetchCarvingPreview = async (taskId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-carving-preview`, {
+      headers: { Authorization: `Token ${props.authToken}` },
+      params: { task_id: taskId },
+    })
+    carvingPreview.value = response.data
+  } catch {
+    // without the preview the toolpath is shown as before
+    carvingPreview.value = null
+  }
+}
+
+const fetchCarvingFiles = async (taskId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-carving-files`, {
+      headers: { Authorization: `Token ${props.authToken}` },
+      params: { task_id: taskId },
+    })
+    carvingFiles.value = response.data
+  } catch {
+    carvingFiles.value = []
+  }
+}
+
+const downloadCarvingFile = async (carvingFile) => {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/api/documents/v1/load_document/${carvingFile.id}`,
+      { headers: { Authorization: `Token ${props.authToken}` } },
+    )
+    sendMessage('saveGcodeFile', {
+      gcode: response.data.content,
+      fileName: `${carvingFile.name}.nc`,
+    })
+  } catch {
+    snackbarText.value = 'Could not download the file.'
+    snackbar.value = true
+  }
+}
+
 const downloadFile = async (taskId) => {
+  const previewRequest = fetchCarvingPreview(taskId)
+  const filesRequest = fetchCarvingFiles(taskId)
   try {
     const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-carving`, {
       headers: { Authorization: `Token ${props.authToken}` },
@@ -676,6 +900,8 @@ const downloadFile = async (taskId) => {
     fileName = contentDisposition.split(';')[1].split('=')[1].replace(/"/g, '')
     fileContent = response.data
 
+    await previewRequest
+    await filesRequest
     submitStatus.value = 'OK'
     loadingProgressBar.value = false
     processingFrozen.value = false
@@ -710,9 +936,12 @@ const checkCarvingStatus = async (taskId) => {
 const submit = async () => {
   console.log('submit!')
   showCanvas.value = false
+  carvingPreview.value = null
+  carvingFiles.value = []
 
+  reliefTouched.value = true
   const isValid = await v$.value.$validate()
-  if (!isValid) {
+  if (!isValid || reliefHeightProblem.value || platformCutProblem.value || safeHeightProblem.value) {
     submitStatus.value = 'ERROR'
     backendError.value = 'Please fill all required fields correctly'
     return
@@ -758,6 +987,25 @@ const converter = async () => {
   if (typeProcessing.value !== '') formData.append('type_processing', typeProcessing.value)
   if (passDepth.value !== '') formData.append('pass_depth', passDepth.value)
   if (passes.value !== '') formData.append('passes', passes.value)
+  if (mode.value === 'MC' && typeProcessing.value === 'in' && mirror.value) {
+    formData.append('mirror', 'true')
+  }
+  if (mode.value === 'MC') {
+    formData.append('processing_stage', carvingStage.value)
+    if (carvingStage.value === 'rough_finish') {
+      formData.append('rough_tool_type', roughToolType.value)
+      if (roughToolDiameter.value !== '') {
+        formData.append('rough_tool_diameter', roughToolDiameter.value)
+      }
+    }
+    if (reliefHeight.value !== '') formData.append('relief_height', reliefHeight.value)
+    if (safeHeight.value !== '') formData.append('safe_z', safeHeight.value)
+    if (platformCut.value !== '') formData.append('platform_cut', platformCut.value)
+    if (stepover.value !== '') formData.append('stepover', stepover.value)
+    formData.append('tool_type', toolType.value)
+    formData.append('relief_enhance', 'true')
+    if (toolDiameter.value !== '') formData.append('tool_diameter', toolDiameter.value)
+  }
 
   let endpoint = ''
   switch (mode.value) {
