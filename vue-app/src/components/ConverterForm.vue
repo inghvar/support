@@ -100,6 +100,20 @@ F
 
         <!-- Carving Parameters -->
         <template v-if="mode === 'MC'">
+          <p class="radio-title">Processing type (choose one):</p>
+          <v-radio-group
+            v-model="carvingStage"
+            hint='Flat figures (line drawings, "pillows") are always processed as finish only, even if "Rough + finish" is selected.'
+            persistent-hint
+            :error-messages="v$.carvingStage.$errors.map(() => 'Choose the processing type')"
+            @update:model-value="v$.carvingStage.$touch()"
+          >
+            <v-radio label="Finish only (takes longer)" value="finish"></v-radio>
+            <v-radio label="Rough + finish" value="rough_finish"></v-radio>
+          </v-radio-group>
+        </template>
+
+        <template v-if="carvingFieldsVisible">
           <v-text-field
             v-model.number="workpieceThickness"
             :error-messages="v$.workpieceThickness.$errors.map((e) => e.$message)"
@@ -162,17 +176,36 @@ F
             class="my-2"
           ></v-text-field>
 
+          <template v-if="carvingStage === 'rough_finish'">
+            <v-select
+              v-model="roughToolType"
+              :items="toolTypeItems"
+              label="Rough tool: type"
+              variant="outlined"
+              class="my-2"
+            ></v-select>
+
+            <v-text-field
+              v-model.number="roughToolDiameter"
+              label="Rough tool: diameter (mm)"
+              :rules="toolDiameterRules"
+              type="number"
+              variant="outlined"
+              class="my-2"
+            ></v-text-field>
+          </template>
+
           <v-select
             v-model="toolType"
             :items="toolTypeItems"
-            label="Tool type"
+            :label="carvingStage === 'rough_finish' ? 'Finish tool: type' : 'Tool type'"
             variant="outlined"
             class="my-2"
           ></v-select>
 
           <v-text-field
             v-model.number="toolDiameter"
-            label="Tool diameter (default 3 mm)"
+            :label="carvingStage === 'rough_finish' ? 'Finish tool: diameter (mm)' : 'Tool diameter (default 3 mm)'"
             :rules="toolDiameterRules"
             type="number"
             variant="outlined"
@@ -196,11 +229,11 @@ F
         </template>
 
         <!-- Max Size -->
-        <div class="row-converter" v-if="mode === 'MC'">
+        <div class="row-converter" v-if="carvingFieldsVisible">
           <p>Set, Max Size, if you want to reduce the image (the largest side will be</p>
           <p>reduced, the smallest side proportionally)</p>
           <v-text-field
-            v-if="mode === 'MC'"
+            v-if="carvingFieldsVisible"
             v-model.number="maxSize"
             :error-messages="v$.maxSize.$errors.map((e) => e.$message)"
             label="Max Size (in pixel)"
@@ -345,7 +378,22 @@ F
 
         <!-- Response Messages -->
         <div class="response mt-4">
-          <v-alert v-if="submitStatus === 'OK'" type="success" variant="tonal" density="compact">
+          <v-alert
+            v-if="submitStatus === 'OK' && mode === 'MC'"
+            type="success"
+            variant="tonal"
+            density="compact"
+          >
+            <p class="mb-2">
+              {{ carvingFiles.length > 1 ? 'Two files are ready. Run the rough one first, then the finish one. Do not move the workpiece between them and set Z again for the finish tool:' : 'The G-code file is ready:' }}
+            </p>
+            <ul class="mb-0">
+              <li v-for="carvingFile in carvingFiles" :key="carvingFile.id">
+                <a href="#" @click.prevent="downloadCarvingFile(carvingFile)">{{ carvingFile.name }}.nc</a>
+              </li>
+            </ul>
+          </v-alert>
+          <v-alert v-if="submitStatus === 'OK' && mode !== 'MC'" type="success" variant="tonal" density="compact">
             G-code generated successfully. You can download it.
           </v-alert>
           <v-alert v-if="submitStatus === 'ERROR'" type="error" variant="tonal" density="compact">
@@ -384,7 +432,7 @@ F
         G-code Preview
 
         <v-btn
-          v-if="generatedGcodeText"
+          v-if="generatedGcodeText && mode !== 'MC'"
           class="ml-4"
           color="primary"
           :disabled="processingFrozen"
@@ -433,6 +481,10 @@ const workpieceThickness = ref('')
 const stepDepth = ref('')
 const reliefHeight = ref('')
 const platformCut = ref('')
+const carvingStage = ref('')
+const roughToolType = ref('flat')
+const roughToolDiameter = ref('')
+const carvingFiles = ref([])
 const safeHeight = ref('')
 const reliefTouched = ref(false)
 const mirror = ref(false)
@@ -565,6 +617,9 @@ const rules = {
   },
   tolerance: { decimal },
   mode: { required },
+  carvingStage: {
+    required: requiredIf(() => mode.value === 'MC'),
+  },
   tracingMode: {
     required: requiredIf(() => mode.value === 'ME' && isSVG.value === true),
   },
@@ -587,6 +642,7 @@ const v$ = useVuelidate(rules, {
   width,
   tolerance,
   mode,
+  carvingStage,
   tracingMode,
   header,
   end,
@@ -597,6 +653,8 @@ const v$ = useVuelidate(rules, {
 })
 
 // Computed
+const carvingFieldsVisible = computed(() => mode.value === 'MC' && carvingStage.value !== '')
+
 const safeHeightProblem = computed(() => {
   if (safeHeight.value === '') return ''
   const value = Number(safeHeight.value)
@@ -794,8 +852,37 @@ const fetchCarvingPreview = async (taskId) => {
   }
 }
 
+const fetchCarvingFiles = async (taskId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-carving-files`, {
+      headers: { Authorization: `Token ${props.authToken}` },
+      params: { task_id: taskId },
+    })
+    carvingFiles.value = response.data
+  } catch {
+    carvingFiles.value = []
+  }
+}
+
+const downloadCarvingFile = async (carvingFile) => {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/api/documents/v1/load_document/${carvingFile.id}`,
+      { headers: { Authorization: `Token ${props.authToken}` } },
+    )
+    sendMessage('saveGcodeFile', {
+      gcode: response.data.content,
+      fileName: `${carvingFile.name}.nc`,
+    })
+  } catch {
+    snackbarText.value = 'Could not download the file.'
+    snackbar.value = true
+  }
+}
+
 const downloadFile = async (taskId) => {
   const previewRequest = fetchCarvingPreview(taskId)
+  const filesRequest = fetchCarvingFiles(taskId)
   try {
     const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-carving`, {
       headers: { Authorization: `Token ${props.authToken}` },
@@ -814,6 +901,7 @@ const downloadFile = async (taskId) => {
     fileContent = response.data
 
     await previewRequest
+    await filesRequest
     submitStatus.value = 'OK'
     loadingProgressBar.value = false
     processingFrozen.value = false
@@ -849,6 +937,7 @@ const submit = async () => {
   console.log('submit!')
   showCanvas.value = false
   carvingPreview.value = null
+  carvingFiles.value = []
 
   reliefTouched.value = true
   const isValid = await v$.value.$validate()
@@ -902,6 +991,13 @@ const converter = async () => {
     formData.append('mirror', 'true')
   }
   if (mode.value === 'MC') {
+    formData.append('processing_stage', carvingStage.value)
+    if (carvingStage.value === 'rough_finish') {
+      formData.append('rough_tool_type', roughToolType.value)
+      if (roughToolDiameter.value !== '') {
+        formData.append('rough_tool_diameter', roughToolDiameter.value)
+      }
+    }
     if (reliefHeight.value !== '') formData.append('relief_height', reliefHeight.value)
     if (safeHeight.value !== '') formData.append('safe_z', safeHeight.value)
     if (platformCut.value !== '') formData.append('platform_cut', platformCut.value)
