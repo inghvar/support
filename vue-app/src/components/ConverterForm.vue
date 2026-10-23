@@ -124,6 +124,16 @@ F
           ></v-text-field>
 
           <v-text-field
+            v-model="safeHeight"
+            label="Safe height Z, mm (default: thickness + 5 mm)"
+            hint="Height above the table the tool retracts to between passes and at the end. Must be greater than the workpiece thickness."
+            :error-messages="safeHeightProblem"
+            persistent-hint
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+
+          <v-text-field
             v-model="platformCut"
             label="Platform cut, % (0 - as is)"
             hint="The higher it is, the lower the platform under the figure and the higher the figure itself (face, folds); the deepest hollows are flattened to the background. Not used for flat figures."
@@ -329,7 +339,7 @@ F
         ></v-textarea>
 
         <!-- Submit Button -->
-        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen || !!reliefHeightProblem || !!platformCutProblem" class="mt-4">
+        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen || !!reliefHeightProblem || !!platformCutProblem || !!safeHeightProblem" class="mt-4">
           Process Image
         </v-btn>
 
@@ -423,6 +433,7 @@ const workpieceThickness = ref('')
 const stepDepth = ref('')
 const reliefHeight = ref('')
 const platformCut = ref('')
+const safeHeight = ref('')
 const reliefTouched = ref(false)
 const mirror = ref(false)
 const typeProcessing = ref('out')
@@ -586,6 +597,16 @@ const v$ = useVuelidate(rules, {
 })
 
 // Computed
+const safeHeightProblem = computed(() => {
+  if (safeHeight.value === '') return ''
+  const value = Number(safeHeight.value)
+  const thickness = parseFloat(workpieceThickness.value)
+  if (isNaN(value) || (!isNaN(thickness) && value <= thickness)) {
+    return 'Safe height must be a number greater than the workpiece thickness.'
+  }
+  return ''
+})
+
 const platformCutProblem = computed(() => {
   if (platformCut.value === '') return ''
   const value = Number(platformCut.value)
@@ -831,7 +852,7 @@ const submit = async () => {
 
   reliefTouched.value = true
   const isValid = await v$.value.$validate()
-  if (!isValid || reliefHeightProblem.value || platformCutProblem.value) {
+  if (!isValid || reliefHeightProblem.value || platformCutProblem.value || safeHeightProblem.value) {
     submitStatus.value = 'ERROR'
     backendError.value = 'Please fill all required fields correctly'
     return
@@ -882,6 +903,7 @@ const converter = async () => {
   }
   if (mode.value === 'MC') {
     if (reliefHeight.value !== '') formData.append('relief_height', reliefHeight.value)
+    if (safeHeight.value !== '') formData.append('safe_z', safeHeight.value)
     if (platformCut.value !== '') formData.append('platform_cut', platformCut.value)
     if (stepover.value !== '') formData.append('stepover', stepover.value)
     formData.append('tool_type', toolType.value)
