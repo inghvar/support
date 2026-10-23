@@ -168,7 +168,8 @@ export default {
 
     /**
      * Builds the solid part from the depth map of the carved surface.
-     * Machine X -> three x, machine Y -> three -z, depth below top -> three -y.
+     * Machine X -> three x, machine Y -> three -z, height above the table
+     * (thickness - depth below the top) -> three y, the table is y = 0.
      */
     buildPart() {
       const { rows, cols, dx, dy, thickness } = this.carvingPreview
@@ -196,7 +197,7 @@ export default {
         for (let c = 0; c < nc; c++) {
           const o = (r * nc + c) * 3
           top[o] = colIdx[c] * dx
-          top[o + 1] = -depth[rowIdx[r] * cols + colIdx[c]] * k
+          top[o + 1] = thickness - depth[rowIdx[r] * cols + colIdx[c]] * k
           top[o + 2] = -rowIdx[r] * dy
         }
       }
@@ -222,7 +223,7 @@ export default {
       topGeometry.computeVertexNormals()
 
       // side walls and bottom of the workpiece
-      const bottomY = -thickness
+      const bottomY = 0
       const wall = []
       const addWall = (p0, p1) => {
         wall.push(

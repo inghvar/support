@@ -105,7 +105,30 @@ F
             :error-messages="v$.workpieceThickness.$errors.map((e) => e.$message)"
             label="Workpiece Thickness (mm)"
             :rules="workpieceThicknessRules"
+            :error="!!reliefHeightError"
             type="number"
+            variant="outlined"
+            class="my-2"
+            @update:model-value="reliefTouched = true"
+          ></v-text-field>
+
+          <v-text-field
+            v-model="reliefHeight"
+            label="Relief height, mm (default 8 mm)"
+            hint="Not used for flat figures (drawings): their relief height is fixed."
+            :error-messages="reliefHeightError"
+            persistent-hint
+            variant="outlined"
+            class="my-2"
+            @update:model-value="reliefTouched = true"
+          ></v-text-field>
+
+          <v-text-field
+            v-model="platformCut"
+            label="Platform cut, % (0 - as is)"
+            hint="The higher it is, the lower the platform under the figure and the higher the figure itself (face, folds); the deepest hollows are flattened to the background. Not used for flat figures."
+            :error-messages="platformCutProblem"
+            persistent-hint
             variant="outlined"
             class="my-2"
           ></v-text-field>
@@ -153,6 +176,13 @@ F
             variant="outlined"
             class="my-2"
           ></v-select>
+          <v-checkbox
+            v-if="typeProcessing === 'in'"
+            v-model="mirror"
+            label="Mirror image"
+            hint="For casting from the matrix: a cast is the mirror image of the matrix, so the picture is flipped horizontally"
+            persistent-hint
+          ></v-checkbox>
         </template>
 
         <!-- Max Size -->
@@ -299,7 +329,7 @@ F
         ></v-textarea>
 
         <!-- Submit Button -->
-        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen" class="mt-4">
+        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen || !!reliefHeightProblem || !!platformCutProblem" class="mt-4">
           Process Image
         </v-btn>
 
@@ -391,11 +421,18 @@ const coordinateZ = ref('')
 const cuttingDepth = ref('')
 const workpieceThickness = ref('')
 const stepDepth = ref('')
+const reliefHeight = ref('')
+const platformCut = ref('')
+const reliefTouched = ref(false)
+const mirror = ref(false)
 const typeProcessing = ref('out')
 const stepover = ref('')
 const toolType = ref('flat')
 const toolDiameter = ref('')
 const carvingPreview = ref(null)
+const DEFAULT_RELIEF_HEIGHT = 8 // mm, fits the default thickness of 10 mm
+const MAX_PLATFORM_CUT = 90 // percent, the same limit as on the server
+const MIN_BOTTOM_THICKNESS = 2 // mm of material that must stay above the table
 const toolTypeItems = [
   { title: 'Flat end mill', value: 'flat' },
   { title: 'Ball end mill', value: 'ball' },
@@ -549,6 +586,29 @@ const v$ = useVuelidate(rules, {
 })
 
 // Computed
+const platformCutProblem = computed(() => {
+  if (platformCut.value === '') return ''
+  const value = Number(platformCut.value)
+  if (isNaN(value) || value < 0 || value > MAX_PLATFORM_CUT) {
+    return `Platform cut must be a number from 0 to ${MAX_PLATFORM_CUT}.`
+  }
+  return ''
+})
+
+const reliefHeightProblem = computed(() => {
+  if (mode.value !== 'MC') return ''
+  const thickness = workpieceThickness.value === '' ? 10 : parseFloat(workpieceThickness.value)
+  const height = reliefHeight.value === '' ? DEFAULT_RELIEF_HEIGHT : parseFloat(reliefHeight.value)
+  if (isNaN(thickness) || isNaN(height)) return ''
+  if (height <= 0) return 'Relief height must be greater than 0.'
+  const left = thickness - height
+  if (left >= MIN_BOTTOM_THICKNESS) return ''
+  const maxHeight = Math.round((thickness - MIN_BOTTOM_THICKNESS) * 10) / 10
+  return `Dangerous distance to the bottom of the workpiece: only ${Math.round(left * 10) / 10} mm would remain under the relief, at least ${MIN_BOTTOM_THICKNESS} mm is required. Reduce the relief height (at most ${maxHeight} mm) or increase the workpiece thickness.`
+})
+
+const reliefHeightError = computed(() => (reliefTouched.value ? reliefHeightProblem.value : ''))
+
 const cuttingDepthWarnings = computed(() => {
   if (passes.value === '' || passDepth.value === '' || cuttingDepth.value === '') {
     return []
@@ -769,8 +829,9 @@ const submit = async () => {
   showCanvas.value = false
   carvingPreview.value = null
 
+  reliefTouched.value = true
   const isValid = await v$.value.$validate()
-  if (!isValid) {
+  if (!isValid || reliefHeightProblem.value || platformCutProblem.value) {
     submitStatus.value = 'ERROR'
     backendError.value = 'Please fill all required fields correctly'
     return
@@ -816,7 +877,12 @@ const converter = async () => {
   if (typeProcessing.value !== '') formData.append('type_processing', typeProcessing.value)
   if (passDepth.value !== '') formData.append('pass_depth', passDepth.value)
   if (passes.value !== '') formData.append('passes', passes.value)
+  if (mode.value === 'MC' && typeProcessing.value === 'in' && mirror.value) {
+    formData.append('mirror', 'true')
+  }
   if (mode.value === 'MC') {
+    if (reliefHeight.value !== '') formData.append('relief_height', reliefHeight.value)
+    if (platformCut.value !== '') formData.append('platform_cut', platformCut.value)
     if (stepover.value !== '') formData.append('stepover', stepover.value)
     formData.append('tool_type', toolType.value)
     formData.append('relief_enhance', 'true')
