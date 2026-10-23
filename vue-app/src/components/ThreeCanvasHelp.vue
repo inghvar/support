@@ -4,6 +4,17 @@
     <canvas class="div-canvas" id="arrowCanvas" ref="arrowCanvas"></canvas>
 
     <div class="view-buttons">
+      <v-btn-toggle
+        v-if="carvingPreview"
+        v-model="carvingView"
+        mandatory
+        class="mr-4 carving-view-toggle"
+        @update:model-value="onCarvingViewChange"
+      >
+        <v-btn value="part">Part</v-btn>
+        <v-btn value="toolpath">Toolpath</v-btn>
+      </v-btn-toggle>
+
       <v-btn color="success" class="mr-4 save-editor" @click="frontView">
         <FrontIcon />
       </v-btn>
@@ -59,6 +70,11 @@ export default {
   props: {
     gcodeSource: {
       required: true
+    },
+    // carved part surface from the backend; when set, the part is shown first
+    carvingPreview: {
+      type: Object,
+      default: null
     }
   },
   components: {
@@ -68,6 +84,9 @@ export default {
   },
   data() {
     return {
+      carvingView: 'part',
+      toolpathLoaded: false,
+
       progress: null,
       dialogp: false,
       isLongGcode: false,
@@ -97,9 +116,17 @@ export default {
     this.linearPoints = []
     this.linearPointsToShow = []
     this.pointsPath = []
+    this.partGroup = null
 
     this.tmpStartVec = null
     this.tmpEndVec = null
+
+    if (this.carvingPreview) {
+      this.initThree()
+      this.buildPart()
+      this.animate()
+      return
+    }
 
     this.initThree()
     if (this.isLongGcode) {
@@ -108,18 +135,163 @@ export default {
     this.animate()
     this.editorRun()
   },
+  beforeUnmount() {
+    cancelAnimationFrame(this.id)
+    if (this.partGroup) {
+      this.disposePart()
+    }
+    if (this.renderer) this.renderer.dispose()
+    if (this.arrowRenderer) this.arrowRenderer.dispose()
+  },
   methods: {
+    onCarvingViewChange(view) {
+      const showPart = view === 'part'
+      if (this.partGroup) this.partGroup.visible = showPart
+      if (!showPart && !this.toolpathLoaded) {
+        this.toolpathLoaded = true
+        this.isLongGcode = this.gcodeSource.split('\n').length > 10000
+        this.editorRun()
+        return
+      }
+      if (this.linesInterpolation) this.linesInterpolation.visible = !showPart
+      if (this.dotsInterpolation) this.dotsInterpolation.visible = !showPart
+    },
+
+    disposePart() {
+      this.partGroup.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose()
+        if (obj.material) obj.material.dispose()
+      })
+      this.scene.remove(this.partGroup)
+      this.partGroup = null
+    },
+
+    /**
+     * Builds the solid part from the depth map of the carved surface.
+     * Machine X -> three x, machine Y -> three -z, depth below top -> three -y.
+     */
+    buildPart() {
+      const { rows, cols, dx, dy, thickness } = this.carvingPreview
+
+      const bytes = Uint8Array.from(atob(this.carvingPreview.depth), c =>
+        c.charCodeAt(0)
+      )
+      const depth = new Uint16Array(bytes.buffer)
+
+      // the grid is decimated when it is too dense for the screen
+      const stride = Math.max(1, Math.ceil(Math.max(rows, cols) / 900))
+      const rowIdx = []
+      for (let i = 0; i < rows; i += stride) rowIdx.push(i)
+      if (rowIdx[rowIdx.length - 1] !== rows - 1) rowIdx.push(rows - 1)
+      const colIdx = []
+      for (let j = 0; j < cols; j += stride) colIdx.push(j)
+      if (colIdx[colIdx.length - 1] !== cols - 1) colIdx.push(cols - 1)
+
+      const nr = rowIdx.length
+      const nc = colIdx.length
+      const k = thickness / 65535
+
+      const top = new Float32Array(nr * nc * 3)
+      for (let r = 0; r < nr; r++) {
+        for (let c = 0; c < nc; c++) {
+          const o = (r * nc + c) * 3
+          top[o] = colIdx[c] * dx
+          top[o + 1] = -depth[rowIdx[r] * cols + colIdx[c]] * k
+          top[o + 2] = -rowIdx[r] * dy
+        }
+      }
+
+      const index = new Uint32Array((nr - 1) * (nc - 1) * 6)
+      let t = 0
+      for (let r = 0; r < nr - 1; r++) {
+        for (let c = 0; c < nc - 1; c++) {
+          const a = r * nc + c
+          const b = a + nc
+          index[t++] = a
+          index[t++] = a + 1
+          index[t++] = b
+          index[t++] = a + 1
+          index[t++] = b + 1
+          index[t++] = b
+        }
+      }
+
+      const topGeometry = new THREE.BufferGeometry()
+      topGeometry.setAttribute('position', new THREE.BufferAttribute(top, 3))
+      topGeometry.setIndex(new THREE.BufferAttribute(index, 1))
+      topGeometry.computeVertexNormals()
+
+      // side walls and bottom of the workpiece
+      const bottomY = -thickness
+      const wall = []
+      const addWall = (p0, p1) => {
+        wall.push(
+          p0[0], p0[1], p0[2],
+          p1[0], p1[1], p1[2],
+          p1[0], bottomY, p1[2],
+          p0[0], p0[1], p0[2],
+          p1[0], bottomY, p1[2],
+          p0[0], bottomY, p0[2]
+        )
+      }
+      const vertex = (r, c) => {
+        const o = (r * nc + c) * 3
+        return [top[o], top[o + 1], top[o + 2]]
+      }
+      for (let c = 0; c < nc - 1; c++) {
+        addWall(vertex(0, c), vertex(0, c + 1))
+        addWall(vertex(nr - 1, c), vertex(nr - 1, c + 1))
+      }
+      for (let r = 0; r < nr - 1; r++) {
+        addWall(vertex(r, 0), vertex(r + 1, 0))
+        addWall(vertex(r, nc - 1), vertex(r + 1, nc - 1))
+      }
+      const xMax = (cols - 1) * dx
+      const zMin = -(rows - 1) * dy
+      wall.push(
+        0, bottomY, 0, xMax, bottomY, 0, xMax, bottomY, zMin,
+        0, bottomY, 0, xMax, bottomY, zMin, 0, bottomY, zMin
+      )
+      const wallGeometry = new THREE.BufferGeometry()
+      wallGeometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(wall, 3)
+      )
+      wallGeometry.computeVertexNormals()
+
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xd9b382,
+        roughness: 0.8,
+        metalness: 0,
+        side: THREE.DoubleSide
+      })
+
+      this.partGroup = new THREE.Group()
+      this.partGroup.add(new THREE.Mesh(topGeometry, material))
+      this.partGroup.add(new THREE.Mesh(wallGeometry, material.clone()))
+      // Three.js r155+ no longer scales light intensity by PI
+      this.partGroup.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
+      const sun = new THREE.DirectionalLight(0xffffff, 0.8 * Math.PI)
+      sun.position.set(-300, 600, 400)
+      this.partGroup.add(sun)
+      this.scene.add(this.partGroup)
+    },
+
     initThree() {
       // console.log(gcodeText)
       // vector for loops
       this.tmpStartVec = new THREE.Vector3()
       this.tmpEndVec = new THREE.Vector3()
 
+      // The website runs Three.js r133 without color management; match its look
+      THREE.ColorManagement.enabled = false
+
       const canvReference = this.$refs.commonCanvas
       this.renderer = new THREE.WebGLRenderer({
         antialias: true,
         canvas: canvReference
       })
+      this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace
       this.renderer.setClearColor(0xeaeaea, 1)
       const container = this.$refs.commonCanvas.parentElement
       const width = container.clientWidth || 800
@@ -163,6 +335,7 @@ export default {
         antialias: true,
         canvas: arrowcanvReference
       }) // clear
+      this.arrowRenderer.outputColorSpace = THREE.LinearSRGBColorSpace
       this.arrowRenderer.setClearColor(0x000000, 0)
       this.arrowRenderer.setSize(CANVAS_WIDTH, CANVAS_HEIGHT)
 
@@ -288,6 +461,11 @@ export default {
       this.linesInterpolation.geometry.dynamic = true
       this.linesInterpolation.geometry.attributes.position.needsUpdate = true
       this.dotsInterpolation = new THREE.Points(pointsGeometry, dotMaterial)
+
+      if (this.carvingPreview && this.carvingView === 'part') {
+        this.linesInterpolation.visible = false
+        this.dotsInterpolation.visible = false
+      }
 
       this.scene.add(this.linesInterpolation)
       this.scene.add(this.dotsInterpolation)

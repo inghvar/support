@@ -120,6 +120,32 @@ F
             class="my-2"
           ></v-text-field>
 
+          <v-text-field
+            v-model.number="stepover"
+            label="Stepover between passes (default 0.3 mm)"
+            :rules="stepoverRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+
+          <v-select
+            v-model="toolType"
+            :items="toolTypeItems"
+            label="Tool type"
+            variant="outlined"
+            class="my-2"
+          ></v-select>
+
+          <v-text-field
+            v-model.number="toolDiameter"
+            label="Tool diameter (default 3 mm)"
+            :rules="toolDiameterRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+
           <v-select
             v-model="typeProcessing"
             :items="['out', 'in']"
@@ -328,7 +354,7 @@ F
         </v-btn>
       </v-card-title>
       <v-card-text>
-        <ThreeCanvasHelp :gcode-source="generatedGcodeText" />
+        <ThreeCanvasHelp :gcode-source="generatedGcodeText" :carving-preview="carvingPreview" />
       </v-card-text>
     </v-card>
   </div>
@@ -366,6 +392,14 @@ const cuttingDepth = ref('')
 const workpieceThickness = ref('')
 const stepDepth = ref('')
 const typeProcessing = ref('out')
+const stepover = ref('')
+const toolType = ref('flat')
+const toolDiameter = ref('')
+const carvingPreview = ref(null)
+const toolTypeItems = [
+  { title: 'Flat end mill', value: 'flat' },
+  { title: 'Ball end mill', value: 'ball' },
+]
 const header = ref('G17\nG90\nG0 X0 Y0\nM3 S800')
 const end = ref('M5')
 const submitStatus = ref('')
@@ -437,6 +471,14 @@ const workpieceThicknessRules = [
 ]
 
 const stepDepthRules = [(value) => !value || value > 0 || 'Value should be greater than 0']
+
+const stepoverRules = [
+  (value) => !value || (value >= 0.1 && value <= 5) || 'Value should be between 0.1 and 5',
+]
+
+const toolDiameterRules = [
+  (value) => !value || (value >= 0.1 && value <= 25) || 'Value should be between 0.1 and 25',
+]
 
 const passDepthRules = [
   (value) => !value || value < 15 || 'Value should be less than 15 mm',
@@ -658,7 +700,21 @@ const fetchCarvingStatus = async (taskId) => {
   }
 }
 
+const fetchCarvingPreview = async (taskId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-carving-preview`, {
+      headers: { Authorization: `Token ${props.authToken}` },
+      params: { task_id: taskId },
+    })
+    carvingPreview.value = response.data
+  } catch {
+    // without the preview the toolpath is shown as before
+    carvingPreview.value = null
+  }
+}
+
 const downloadFile = async (taskId) => {
+  const previewRequest = fetchCarvingPreview(taskId)
   try {
     const response = await axios.get(`${API_BASE_URL}/api/converter/v1/get-carving`, {
       headers: { Authorization: `Token ${props.authToken}` },
@@ -676,6 +732,7 @@ const downloadFile = async (taskId) => {
     fileName = contentDisposition.split(';')[1].split('=')[1].replace(/"/g, '')
     fileContent = response.data
 
+    await previewRequest
     submitStatus.value = 'OK'
     loadingProgressBar.value = false
     processingFrozen.value = false
@@ -710,6 +767,7 @@ const checkCarvingStatus = async (taskId) => {
 const submit = async () => {
   console.log('submit!')
   showCanvas.value = false
+  carvingPreview.value = null
 
   const isValid = await v$.value.$validate()
   if (!isValid) {
@@ -758,6 +816,12 @@ const converter = async () => {
   if (typeProcessing.value !== '') formData.append('type_processing', typeProcessing.value)
   if (passDepth.value !== '') formData.append('pass_depth', passDepth.value)
   if (passes.value !== '') formData.append('passes', passes.value)
+  if (mode.value === 'MC') {
+    if (stepover.value !== '') formData.append('stepover', stepover.value)
+    formData.append('tool_type', toolType.value)
+    formData.append('relief_enhance', 'true')
+    if (toolDiameter.value !== '') formData.append('tool_diameter', toolDiameter.value)
+  }
 
   let endpoint = ''
   switch (mode.value) {
