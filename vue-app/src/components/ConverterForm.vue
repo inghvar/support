@@ -244,11 +244,11 @@ F
         </div>
 
         <div class="row-converter" v-if="mode === 'ME'">
-          <p>Height of the processing area</p>
+          <p>Length of the processing area (Y axis)</p>
           <v-text-field
             v-model.number="height"
             :error-messages="heightErrors"
-            label="Height (mm)"
+            label="Length (mm)"
             :rules="heightRules"
             type="number"
             variant="outlined"
@@ -258,7 +258,7 @@ F
         </div>
 
         <div class="row-converter" v-if="mode === 'ME'">
-          <p>Width of the processing area</p>
+          <p>Width of the processing area (X axis)</p>
           <v-text-field
             v-model.number="width"
             :error-messages="widthErrors"
@@ -272,6 +272,19 @@ F
         </div>
 
         <template v-if="mode === 'ME'">
+          <v-text-field
+            v-model.number="workpieceThickness"
+            :error-messages="v$.workpieceThickness.$errors.map((e) => e.$message)"
+            label="Workpiece Thickness (default 10 mm)"
+            :rules="workpieceThicknessRules"
+            :messages="engravingDepthProblem"
+            :error="!!engravingDepthProblem"
+            type="number"
+            variant="outlined"
+            class="my-2"
+            @update:model-value="v$.workpieceThickness.$touch()"
+          ></v-text-field>
+
           <v-select
             v-model="engravingToolType"
             :items="engravingToolTypeItems"
@@ -337,6 +350,7 @@ F
 
         <!-- Coordinate Z -->
         <v-text-field
+          v-if="mode !== 'ME'"
           v-model.number="coordinateZ"
           :error-messages="v$.coordinateZ.$errors.map((e) => e.$message)"
           label="Coordinate Z, cutting tool lifting height (50 mm)"
@@ -401,7 +415,7 @@ F
         ></v-textarea>
 
         <!-- Submit Button -->
-        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen || !!reliefHeightProblem || !!platformCutProblem || !!safeHeightProblem" class="mt-4">
+        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen || !!engravingDepthProblem || !!reliefHeightProblem || !!platformCutProblem || !!safeHeightProblem" class="mt-4">
           Process Image
         </v-btn>
 
@@ -730,6 +744,14 @@ const reliefHeightProblem = computed(() => {
 
 const reliefHeightError = computed(() => (reliefTouched.value ? reliefHeightProblem.value : ''))
 
+const engravingDepthProblem = computed(() => {
+  if (mode.value !== 'ME') return ''
+  const thickness = workpieceThickness.value === '' ? 10 : parseFloat(workpieceThickness.value)
+  const depth = parseFloat(cuttingDepth.value)
+  if (isNaN(thickness) || isNaN(depth) || depth < thickness) return ''
+  return 'Cutting depth must be less than the workpiece thickness'
+})
+
 const cuttingDepthWarnings = computed(() => {
   if (passes.value === '' || passDepth.value === '' || cuttingDepth.value === '') {
     return []
@@ -984,7 +1006,7 @@ const submit = async () => {
 
   reliefTouched.value = true
   const isValid = await v$.value.$validate()
-  if (!isValid || reliefHeightProblem.value || platformCutProblem.value || safeHeightProblem.value) {
+  if (!isValid || engravingDepthProblem.value || reliefHeightProblem.value || platformCutProblem.value || safeHeightProblem.value) {
     submitStatus.value = 'ERROR'
     backendError.value = 'Please fill all required fields correctly'
     return
@@ -1061,6 +1083,7 @@ const converter = async () => {
       type: engravingToolType.value,
       diameter: parseFloat(engravingToolDiameter.value) || 3,
       angle: parseFloat(toolAngle.value) || 60,
+      thickness: parseFloat(workpieceThickness.value) || 10,
     }
   }
 

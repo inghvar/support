@@ -61,7 +61,6 @@ import {
   linearInterpolationIncremental
 } from '../assets/js/gcodeParse'
 import {
-  BASE_THICKNESS_MM,
   buildDepthField,
   parseCuttingSegments
 } from '../assets/js/engravingSurface'
@@ -88,6 +87,7 @@ const ENGRAVING_FRAGMENT_SHADER = `
   uniform vec2 uSize;
   uniform float uPixel;
   uniform float uMaxDepth;
+  uniform float uTop;
   uniform vec3 uColor;
   uniform vec3 uLight;
   varying vec3 vWorld;
@@ -117,7 +117,7 @@ const ENGRAVING_FRAGMENT_SHADER = `
       for (int i = 1; i <= 160; i++) {
         float ti = tMax * float(i) / 160.0;
         vec3 p = vWorld + dir * ti;
-        if (-p.y > depthAt(p.xz)) {
+        if (uTop - p.y > depthAt(p.xz)) {
           hi = ti;
           break;
         }
@@ -126,7 +126,7 @@ const ENGRAVING_FRAGMENT_SHADER = `
       for (int i = 0; i < 12; i++) {
         float mid = 0.5 * (lo + hi);
         vec3 p = vWorld + dir * mid;
-        if (-p.y > depthAt(p.xz)) hi = mid; else lo = mid;
+        if (uTop - p.y > depthAt(p.xz)) hi = mid; else lo = mid;
       }
       t = hi;
       hit = vWorld + dir * t;
@@ -161,8 +161,8 @@ export default {
       type: Object,
       default: null
     },
-    // tool of the engraving { type, diameter, angle }; the grooves are
-    // calculated here from the G-code
+    // tool of the engraving { type, diameter, angle, thickness }; the grooves
+    // are calculated here from the G-code
     engravingTool: {
       type: Object,
       default: null
@@ -397,8 +397,9 @@ export default {
         diameter: this.engravingTool.diameter,
         angle: this.engravingTool.angle
       }
+      const plateTop = this.engravingTool.thickness
       const field = buildDepthField(
-        parseCuttingSegments(this.gcodeSource),
+        parseCuttingSegments(this.gcodeSource, plateTop),
         tool,
         Math.min(4096, this.renderer.capabilities.maxTextureSize)
       )
@@ -423,7 +424,6 @@ export default {
 
       const width = cols * pixel
       const height = rows * pixel
-      const thickness = maxDepth + BASE_THICKNESS_MM
       const xMax = x0 + width
       const zMax = -y0
       const zMin = -(y0 + height)
@@ -435,6 +435,7 @@ export default {
           uSize: { value: new THREE.Vector2(width, height) },
           uPixel: { value: pixel },
           uMaxDepth: { value: maxDepth },
+          uTop: { value: plateTop },
           uColor: { value: new THREE.Color(0xd9b382) },
           uLight: { value: new THREE.Vector3(-300, 600, 400).normalize() }
         },
@@ -446,19 +447,19 @@ export default {
         material
       )
       top.rotation.x = -Math.PI / 2
-      top.position.set(x0 + width / 2, 0, (zMax + zMin) / 2)
+      top.position.set(x0 + width / 2, plateTop, (zMax + zMin) / 2)
 
-      const bottomY = -thickness
+      const bottomY = 0
       const quad = (a, b, c, d) => [...a, ...b, ...c, ...a, ...c, ...d]
       const side = new THREE.BufferGeometry()
       side.setAttribute(
         'position',
         new THREE.Float32BufferAttribute(
           [
-            ...quad([x0, 0, zMax], [xMax, 0, zMax], [xMax, bottomY, zMax], [x0, bottomY, zMax]),
-            ...quad([xMax, 0, zMax], [xMax, 0, zMin], [xMax, bottomY, zMin], [xMax, bottomY, zMax]),
-            ...quad([xMax, 0, zMin], [x0, 0, zMin], [x0, bottomY, zMin], [xMax, bottomY, zMin]),
-            ...quad([x0, 0, zMin], [x0, 0, zMax], [x0, bottomY, zMax], [x0, bottomY, zMin]),
+            ...quad([x0, plateTop, zMax], [xMax, plateTop, zMax], [xMax, bottomY, zMax], [x0, bottomY, zMax]),
+            ...quad([xMax, plateTop, zMax], [xMax, plateTop, zMin], [xMax, bottomY, zMin], [xMax, bottomY, zMax]),
+            ...quad([xMax, plateTop, zMin], [x0, plateTop, zMin], [x0, bottomY, zMin], [xMax, bottomY, zMin]),
+            ...quad([x0, plateTop, zMin], [x0, plateTop, zMax], [x0, bottomY, zMax], [x0, bottomY, zMin]),
             ...quad([x0, bottomY, zMax], [xMax, bottomY, zMax], [xMax, bottomY, zMin], [x0, bottomY, zMin])
           ],
           3

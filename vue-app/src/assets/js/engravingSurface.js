@@ -1,12 +1,11 @@
-// Depth of the grooves cut by an engraving G-code (Z=0 is the top of the
-// workpiece). Used to show the engraved part in the viewer.
+// Depth of the grooves cut by an engraving G-code (the top of the workpiece
+// is at Z = surfaceZ). Used to show the engraved part in the viewer.
 
 export const TOOL_FLAT = 'flat'
 export const TOOL_BALL = 'ball'
 export const TOOL_VBIT = 'vbit'
 
 export const PLATE_MARGIN_MM = 2
-export const BASE_THICKNESS_MM = 3
 const MIN_PIXEL_MM = 0.05
 const EDGE_WIDTH_CELLS = 1.5
 
@@ -14,10 +13,11 @@ const COMMENT_RE = /;.*|\([^)]*\)/g
 const WORD_RE = /([GXYZ])\s*(-?\d+(?:\.\d*)?|-?\.\d+)/gi
 
 /**
- * Straight feed moves (G1) of an absolute G-code, cut to the part below Z=0.
- * Returns a Float64Array of rows (x0, y0, z0, x1, y1, z1).
+ * Straight feed moves (G1) of an absolute G-code, cut to the part below the
+ * workpiece top. Returns a Float64Array of rows (x0, y0, z0, x1, y1, z1),
+ * with z measured from the top (<= 0).
  */
-export function parseCuttingSegments (gcode) {
+export function parseCuttingSegments (gcode, surfaceZ = 0) {
   const segments = []
   let position = [0, 0, 0]
   let feed = false
@@ -39,7 +39,10 @@ export function parseCuttingSegments (gcode) {
     }
     if (!moved) continue
     if (feed) {
-      const segment = clipBelowSurface(position, target)
+      const segment = clipBelowSurface(
+        [position[0], position[1], position[2] - surfaceZ],
+        [target[0], target[1], target[2] - surfaceZ]
+      )
       if (segment) segments.push(...segment)
     }
     position = target
