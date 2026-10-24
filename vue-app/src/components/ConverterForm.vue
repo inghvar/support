@@ -244,11 +244,11 @@ F
         </div>
 
         <div class="row-converter" v-if="mode === 'ME'">
-          <p>Height of the processing area</p>
+          <p>Length of the processing area (Y axis)</p>
           <v-text-field
             v-model.number="height"
             :error-messages="heightErrors"
-            label="Height (mm)"
+            label="Length (mm)"
             :rules="heightRules"
             type="number"
             variant="outlined"
@@ -258,7 +258,7 @@ F
         </div>
 
         <div class="row-converter" v-if="mode === 'ME'">
-          <p>Width of the processing area</p>
+          <p>Width of the processing area (X axis)</p>
           <v-text-field
             v-model.number="width"
             :error-messages="widthErrors"
@@ -270,6 +270,48 @@ F
             @update:model-value="v$.width.$touch()"
           ></v-text-field>
         </div>
+
+        <template v-if="mode === 'ME'">
+          <v-text-field
+            v-model.number="workpieceThickness"
+            :error-messages="v$.workpieceThickness.$errors.map((e) => e.$message)"
+            label="Workpiece Thickness (default 10 mm)"
+            :rules="workpieceThicknessRules"
+            :messages="engravingDepthProblem"
+            :error="!!engravingDepthProblem"
+            type="number"
+            variant="outlined"
+            class="my-2"
+            @update:model-value="v$.workpieceThickness.$touch()"
+          ></v-text-field>
+
+          <v-select
+            v-model="engravingToolType"
+            :items="engravingToolTypeItems"
+            label="Tool type"
+            variant="outlined"
+            class="my-2"
+          ></v-select>
+
+          <v-text-field
+            v-model.number="engravingToolDiameter"
+            :label="engravingToolType === 'vbit' ? 'V-bit diameter (maximum cutting diameter, default 3 mm)' : 'Tool diameter (default 3 mm)'"
+            :rules="toolDiameterRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+
+          <v-text-field
+            v-if="engravingToolType === 'vbit'"
+            v-model.number="toolAngle"
+            label="V-bit angle, degrees (default 60)"
+            :rules="toolAngleRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+        </template>
 
         <!-- Tolerance -->
         <p>Set Tolerance (distance between approximation points)</p>
@@ -308,6 +350,7 @@ F
 
         <!-- Coordinate Z -->
         <v-text-field
+          v-if="mode !== 'ME'"
           v-model.number="coordinateZ"
           :error-messages="v$.coordinateZ.$errors.map((e) => e.$message)"
           label="Coordinate Z, cutting tool lifting height (50 mm)"
@@ -372,7 +415,7 @@ F
         ></v-textarea>
 
         <!-- Submit Button -->
-        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen || !!reliefHeightProblem || !!platformCutProblem || !!safeHeightProblem" class="mt-4">
+        <v-btn type="submit" color="success" size="large" variant="flat" :disabled="processingFrozen || !!engravingDepthProblem || !!reliefHeightProblem || !!platformCutProblem || !!safeHeightProblem" class="mt-4">
           Process Image
         </v-btn>
 
@@ -442,7 +485,11 @@ F
         </v-btn>
       </v-card-title>
       <v-card-text>
-        <ThreeCanvasHelp :gcode-source="generatedGcodeText" :carving-preview="carvingPreview" />
+        <ThreeCanvasHelp
+          :gcode-source="generatedGcodeText"
+          :carving-preview="carvingPreview"
+          :engraving-tool="engravingTool"
+        />
       </v-card-text>
     </v-card>
   </div>
@@ -492,7 +539,11 @@ const typeProcessing = ref('out')
 const stepover = ref('')
 const toolType = ref('flat')
 const toolDiameter = ref('')
+const engravingToolType = ref('flat')
+const engravingToolDiameter = ref('')
+const toolAngle = ref('')
 const carvingPreview = ref(null)
+const engravingTool = ref(null)
 const DEFAULT_RELIEF_HEIGHT = 8 // mm, fits the default thickness of 10 mm
 const MAX_PLATFORM_CUT = 90 // percent, the same limit as on the server
 const MIN_BOTTOM_THICKNESS = 2 // mm of material that must stay above the table
@@ -500,6 +551,7 @@ const toolTypeItems = [
   { title: 'Flat end mill', value: 'flat' },
   { title: 'Ball end mill', value: 'ball' },
 ]
+const engravingToolTypeItems = [...toolTypeItems, { title: 'V-bit', value: 'vbit' }]
 const header = ref('G17\nG90\nG0 X0 Y0\nM3 S800')
 const end = ref('M5')
 const submitStatus = ref('')
@@ -578,6 +630,10 @@ const stepoverRules = [
 
 const toolDiameterRules = [
   (value) => !value || (value >= 0.1 && value <= 25) || 'Value should be between 0.1 and 25',
+]
+
+const toolAngleRules = [
+  (value) => !value || (value >= 10 && value <= 150) || 'Value should be between 10 and 150',
 ]
 
 const passDepthRules = [
@@ -687,6 +743,14 @@ const reliefHeightProblem = computed(() => {
 })
 
 const reliefHeightError = computed(() => (reliefTouched.value ? reliefHeightProblem.value : ''))
+
+const engravingDepthProblem = computed(() => {
+  if (mode.value !== 'ME') return ''
+  const thickness = workpieceThickness.value === '' ? 10 : parseFloat(workpieceThickness.value)
+  const depth = parseFloat(cuttingDepth.value)
+  if (isNaN(thickness) || isNaN(depth) || depth < thickness) return ''
+  return 'Cutting depth must be less than the workpiece thickness'
+})
 
 const cuttingDepthWarnings = computed(() => {
   if (passes.value === '' || passDepth.value === '' || cuttingDepth.value === '') {
@@ -937,11 +1001,12 @@ const submit = async () => {
   console.log('submit!')
   showCanvas.value = false
   carvingPreview.value = null
+  engravingTool.value = null
   carvingFiles.value = []
 
   reliefTouched.value = true
   const isValid = await v$.value.$validate()
-  if (!isValid || reliefHeightProblem.value || platformCutProblem.value || safeHeightProblem.value) {
+  if (!isValid || engravingDepthProblem.value || reliefHeightProblem.value || platformCutProblem.value || safeHeightProblem.value) {
     submitStatus.value = 'ERROR'
     backendError.value = 'Please fill all required fields correctly'
     return
@@ -1005,6 +1070,21 @@ const converter = async () => {
     formData.append('tool_type', toolType.value)
     formData.append('relief_enhance', 'true')
     if (toolDiameter.value !== '') formData.append('tool_diameter', toolDiameter.value)
+  }
+  if (mode.value === 'ME') {
+    formData.append('tool_type', engravingToolType.value)
+    if (engravingToolDiameter.value !== '') {
+      formData.append('tool_diameter', engravingToolDiameter.value)
+    }
+    if (engravingToolType.value === 'vbit' && toolAngle.value !== '') {
+      formData.append('tool_angle', toolAngle.value)
+    }
+    engravingTool.value = {
+      type: engravingToolType.value,
+      diameter: parseFloat(engravingToolDiameter.value) || 3,
+      angle: parseFloat(toolAngle.value) || 60,
+      thickness: parseFloat(workpieceThickness.value) || 10,
+    }
   }
 
   let endpoint = ''

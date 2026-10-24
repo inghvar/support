@@ -1,3 +1,10 @@
+Version 0.4.1: October 24, 2026
+
+Enhancements
+- Milling, Engraving: tool type (flat, ball, V-bit), tool diameter and V-bit angle, workpiece thickness, 3D preview of the engraved part.
+- G-code viewer: coordinate numbers along the axes, fixed colors of arcs.
+
+
 Version 0.4.0: October 23, 2026
 
 Enhancements

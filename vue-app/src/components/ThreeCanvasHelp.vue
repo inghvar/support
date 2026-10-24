@@ -5,7 +5,7 @@
 
     <div class="view-buttons">
       <v-btn-toggle
-        v-if="carvingPreview"
+        v-if="hasPart"
         v-model="carvingView"
         mandatory
         class="mr-4 carving-view-toggle"
@@ -60,10 +60,95 @@ import {
   checkPositioningSystem,
   linearInterpolationIncremental
 } from '../assets/js/gcodeParse'
+import {
+  buildDepthField,
+  parseCuttingSegments
+} from '../assets/js/engravingSurface'
 
 import TopIcon from './TopIcon.vue'
 import FrontIcon from './FrontIcon.vue'
 import IsometricIcon from './IsometricIcon.vue'
+
+const ENGRAVING_VERTEX_SHADER = `
+  varying vec3 vWorld;
+  void main () {
+    vec4 world = modelMatrix * vec4(position, 1.0);
+    vWorld = world.xyz;
+    gl_Position = projectionMatrix * viewMatrix * world;
+  }
+`
+
+// The top face is the plane y = 0. A ray that meets it above a groove is
+// followed down until it reaches the bottom or the wall of the groove.
+const ENGRAVING_FRAGMENT_SHADER = `
+  uniform mat4 projectionMatrix;
+  uniform sampler2D uDepth;
+  uniform vec2 uOrigin;
+  uniform vec2 uSize;
+  uniform float uPixel;
+  uniform float uMaxDepth;
+  uniform float uTop;
+  uniform vec3 uColor;
+  uniform vec3 uLight;
+  varying vec3 vWorld;
+
+  // depth of the groove under the point (x, z); machine Y = -z
+  float depthAt (vec2 xz) {
+    vec2 uv = vec2(
+      (xz.x - uOrigin.x) / uSize.x,
+      (-xz.y - uOrigin.y) / uSize.y
+    );
+    return texture2D(uDepth, uv).r;
+  }
+
+  void main () {
+    vec3 dir = projectionMatrix[3][3] == 1.0
+      ? -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2])
+      : normalize(vWorld - cameraPosition);
+
+    vec3 hit = vWorld;
+    float t = 0.0;
+    float grooveDepth = depthAt(vWorld.xz);
+
+    if (grooveDepth > 0.002 && dir.y < -1e-4) {
+      float tMax = (uMaxDepth + 0.01) / -dir.y;
+      float lo = 0.0;
+      float hi = tMax;
+      for (int i = 1; i <= 160; i++) {
+        float ti = tMax * float(i) / 160.0;
+        vec3 p = vWorld + dir * ti;
+        if (uTop - p.y > depthAt(p.xz)) {
+          hi = ti;
+          break;
+        }
+        lo = ti;
+      }
+      for (int i = 0; i < 12; i++) {
+        float mid = 0.5 * (lo + hi);
+        vec3 p = vWorld + dir * mid;
+        if (uTop - p.y > depthAt(p.xz)) hi = mid; else lo = mid;
+      }
+      t = hi;
+      hit = vWorld + dir * t;
+    }
+
+    vec3 normal = vec3(0.0, 1.0, 0.0);
+    float shade = 1.0;
+    if (t > 0.0) {
+      vec2 e = vec2(uPixel, 0.0);
+      float dx = depthAt(hit.xz + e.xy) - depthAt(hit.xz - e.xy);
+      float dz = depthAt(hit.xz + e.yx) - depthAt(hit.xz - e.yx);
+      normal = normalize(vec3(dx, 2.0 * uPixel, dz));
+      shade = 1.0 - 0.25 * clamp(depthAt(hit.xz) / uMaxDepth, 0.0, 1.0);
+    }
+
+    float light = 0.55 + 0.8 * max(dot(normal, uLight), 0.0);
+    gl_FragColor = vec4(uColor * light * shade, 1.0);
+
+    vec4 clip = projectionMatrix * viewMatrix * vec4(hit, 1.0);
+    gl_FragDepth = (clip.z / clip.w) * 0.5 + 0.5;
+  }
+`
 
 export default {
   name: 'ThreeCanvasHelp',
@@ -73,6 +158,12 @@ export default {
     },
     // carved part surface from the backend; when set, the part is shown first
     carvingPreview: {
+      type: Object,
+      default: null
+    },
+    // tool of the engraving { type, diameter, angle, thickness }; the grooves
+    // are calculated here from the G-code
+    engravingTool: {
       type: Object,
       default: null
     }
@@ -85,6 +176,7 @@ export default {
   data() {
     return {
       carvingView: 'part',
+      hasPart: false,
       toolpathLoaded: false,
 
       progress: null,
@@ -121,10 +213,16 @@ export default {
     this.tmpStartVec = null
     this.tmpEndVec = null
 
-    if (this.carvingPreview) {
+    if (this.carvingPreview || this.engravingTool) {
       this.initThree()
-      this.buildPart()
+      this.hasPart = this.carvingPreview
+        ? (this.buildPart(), true)
+        : this.buildEngravingPart()
       this.animate()
+      if (this.hasPart) return
+      this.isLongGcode = this.gcodeSource.split('\n').length > 10000
+      this.dialogp = this.isLongGcode
+      this.editorRun()
       return
     }
 
@@ -139,6 +237,12 @@ export default {
     cancelAnimationFrame(this.id)
     if (this.partGroup) {
       this.disposePart()
+    }
+    if (this.axisLabels) {
+      this.axisLabels.children.forEach(sprite => {
+        sprite.material.map.dispose()
+        sprite.material.dispose()
+      })
     }
     if (this.renderer) this.renderer.dispose()
     if (this.arrowRenderer) this.arrowRenderer.dispose()
@@ -173,6 +277,13 @@ export default {
      */
     buildPart() {
       const { rows, cols, dx, dy, thickness } = this.carvingPreview
+      // optional: grid offset and Z of the workpiece top (engraving, Z0 = top)
+      const x0 = this.carvingPreview.x0 || 0
+      const y0 = this.carvingPreview.y0 || 0
+      const topZ =
+        this.carvingPreview.top_z !== undefined
+          ? this.carvingPreview.top_z
+          : thickness
 
       const bytes = Uint8Array.from(atob(this.carvingPreview.depth), c =>
         c.charCodeAt(0)
@@ -196,9 +307,9 @@ export default {
       for (let r = 0; r < nr; r++) {
         for (let c = 0; c < nc; c++) {
           const o = (r * nc + c) * 3
-          top[o] = colIdx[c] * dx
-          top[o + 1] = thickness - depth[rowIdx[r] * cols + colIdx[c]] * k
-          top[o + 2] = -rowIdx[r] * dy
+          top[o] = x0 + colIdx[c] * dx
+          top[o + 1] = topZ - depth[rowIdx[r] * cols + colIdx[c]] * k
+          top[o + 2] = -(y0 + rowIdx[r] * dy)
         }
       }
 
@@ -223,7 +334,7 @@ export default {
       topGeometry.computeVertexNormals()
 
       // side walls and bottom of the workpiece
-      const bottomY = 0
+      const bottomY = topZ - thickness
       const wall = []
       const addWall = (p0, p1) => {
         wall.push(
@@ -247,11 +358,13 @@ export default {
         addWall(vertex(r, 0), vertex(r + 1, 0))
         addWall(vertex(r, nc - 1), vertex(r + 1, nc - 1))
       }
-      const xMax = (cols - 1) * dx
-      const zMin = -(rows - 1) * dy
+      const xMin = x0
+      const zMax = -y0
+      const xMax = x0 + (cols - 1) * dx
+      const zMin = -(y0 + (rows - 1) * dy)
       wall.push(
-        0, bottomY, 0, xMax, bottomY, 0, xMax, bottomY, zMin,
-        0, bottomY, 0, xMax, bottomY, zMin, 0, bottomY, zMin
+        xMin, bottomY, zMax, xMax, bottomY, zMax, xMax, bottomY, zMin,
+        xMin, bottomY, zMax, xMax, bottomY, zMin, xMin, bottomY, zMin
       )
       const wallGeometry = new THREE.BufferGeometry()
       wallGeometry.setAttribute(
@@ -276,6 +389,110 @@ export default {
       sun.position.set(-300, 600, 400)
       this.partGroup.add(sun)
       this.scene.add(this.partGroup)
+    },
+
+    /**
+     * Builds the engraved part: a flat top face whose grooves are traced per
+     * pixel in the shader from the depth map, so their walls stay smooth at
+     * any zoom, and the side walls of the plate.
+     * Returns false when the G-code cuts nothing.
+     */
+    buildEngravingPart() {
+      const tool = {
+        type: this.engravingTool.type,
+        diameter: this.engravingTool.diameter,
+        angle: this.engravingTool.angle
+      }
+      const plateTop = this.engravingTool.thickness
+      const field = buildDepthField(
+        parseCuttingSegments(this.gcodeSource, plateTop),
+        tool,
+        Math.min(4096, this.renderer.capabilities.maxTextureSize)
+      )
+      if (!field) return false
+
+      const { depth, cols, rows, x0, y0, pixel, maxDepth } = field
+      const half = new Uint16Array(depth.length)
+      for (let i = 0; i < depth.length; i++) {
+        if (depth[i] > 0) half[i] = THREE.DataUtils.toHalfFloat(depth[i])
+      }
+      const texture = new THREE.DataTexture(
+        half,
+        cols,
+        rows,
+        THREE.RedFormat,
+        THREE.HalfFloatType
+      )
+      texture.minFilter = THREE.LinearFilter
+      texture.magFilter = THREE.LinearFilter
+      texture.generateMipmaps = false
+      texture.needsUpdate = true
+
+      const width = cols * pixel
+      const height = rows * pixel
+      const xMax = x0 + width
+      const zMax = -y0
+      const zMin = -(y0 + height)
+
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          uDepth: { value: texture },
+          uOrigin: { value: new THREE.Vector2(x0, y0) },
+          uSize: { value: new THREE.Vector2(width, height) },
+          uPixel: { value: pixel },
+          uMaxDepth: { value: maxDepth },
+          uTop: { value: plateTop },
+          uColor: { value: new THREE.Color(0xd9b382) },
+          uLight: { value: new THREE.Vector3(-300, 600, 400).normalize() }
+        },
+        vertexShader: ENGRAVING_VERTEX_SHADER,
+        fragmentShader: ENGRAVING_FRAGMENT_SHADER
+      })
+      const top = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, height),
+        material
+      )
+      top.rotation.x = -Math.PI / 2
+      top.position.set(x0 + width / 2, plateTop, (zMax + zMin) / 2)
+
+      const bottomY = 0
+      const quad = (a, b, c, d) => [...a, ...b, ...c, ...a, ...c, ...d]
+      const side = new THREE.BufferGeometry()
+      side.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(
+          [
+            ...quad([x0, plateTop, zMax], [xMax, plateTop, zMax], [xMax, bottomY, zMax], [x0, bottomY, zMax]),
+            ...quad([xMax, plateTop, zMax], [xMax, plateTop, zMin], [xMax, bottomY, zMin], [xMax, bottomY, zMax]),
+            ...quad([xMax, plateTop, zMin], [x0, plateTop, zMin], [x0, bottomY, zMin], [xMax, bottomY, zMin]),
+            ...quad([x0, plateTop, zMin], [x0, plateTop, zMax], [x0, bottomY, zMax], [x0, bottomY, zMin]),
+            ...quad([x0, bottomY, zMax], [xMax, bottomY, zMax], [xMax, bottomY, zMin], [x0, bottomY, zMin])
+          ],
+          3
+        )
+      )
+      side.computeVertexNormals()
+
+      this.partGroup = new THREE.Group()
+      this.partGroup.add(top)
+      this.partGroup.add(
+        new THREE.Mesh(
+          side,
+          new THREE.MeshStandardMaterial({
+            color: 0xd9b382,
+            roughness: 0.8,
+            metalness: 0,
+            side: THREE.DoubleSide
+          })
+        )
+      )
+      // Three.js r155+ no longer scales light intensity by PI
+      this.partGroup.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
+      const sun = new THREE.DirectionalLight(0xffffff, 0.8 * Math.PI)
+      sun.position.set(-300, 600, 400)
+      this.partGroup.add(sun)
+      this.scene.add(this.partGroup)
+      return true
     },
 
     initThree() {
@@ -325,6 +542,7 @@ export default {
       this.gridHelper.material.opacity = 0.4
       this.gridHelper.material.transparent = true
       this.scene.add(this.gridHelper)
+      this.buildAxisLabels()
 
       // ---------------------- inset arrow canvas ----------------------
 
@@ -404,7 +622,9 @@ export default {
         } else if (this.listModes[i] === 'G1') {
           colors.push(0, 0, 255, 0, 0, 255)
         } else if (this.listModes[i] === 'G2' || this.listModes[i] === 'G3') {
-          for (var k = 0; k <= 20; k++) {
+          // an arc is drawn with 20 vertices (getPoints(19) below), so it needs exactly 20 vertex colors;
+          // each push adds 2 vertices. A larger count shifts the colors of all following segments
+          for (var k = 0; k < 10; k++) {
             colors.push(0, 0, 255, 0, 0, 255)
           }
         }
@@ -463,7 +683,7 @@ export default {
       this.linesInterpolation.geometry.attributes.position.needsUpdate = true
       this.dotsInterpolation = new THREE.Points(pointsGeometry, dotMaterial)
 
-      if (this.carvingPreview && this.carvingView === 'part') {
+      if (this.hasPart && this.carvingView === 'part') {
         this.linesInterpolation.visible = false
         this.dotsInterpolation.visible = false
       }
@@ -726,8 +946,84 @@ export default {
       }
     },
 
+    /**
+     * Puts the coordinate numbers (in mm) along the X and Y axes of the grid.
+     * The mapping is the same as for the toolpath: machine X -> three x, machine Y -> three -z,
+     * so the label of a point at three z is -z. Labels are sprites; their size in pixels is
+     * kept constant by updateAxisLabels(), because the orthographic camera is zoomed by camera.zoom.
+     */
+    buildAxisLabels() {
+      const half = 400 // half of the grid size (the grid is 800 x 800 mm)
+      const step = 50 // distance between the labels, in mm
+      this.axisLabels = new THREE.Group()
+
+      for (let v = -half; v <= half; v += step) {
+        // the origin is labeled once, below and to the left of the point
+        if (v === 0) {
+          this.axisLabels.add(this.makeAxisLabel('0', 0, 0, 1.15, 1.15))
+          continue
+        }
+        // X axis: the label hangs below the axis point
+        this.axisLabels.add(this.makeAxisLabel(String(v), v, 0, 0.5, 1.15))
+        // Y axis: the label is to the left of the axis point; three z = -machine Y
+        this.axisLabels.add(this.makeAxisLabel(String(v), 0, -v, 1.15, 0.5))
+      }
+
+      this.scene.add(this.axisLabels)
+      this.updateAxisLabels()
+    },
+
+    /**
+     * Creates one text sprite lying on the grid plane (y = 0) at the three.js point (x, 0, z).
+     * anchorX/anchorY set which point of the sprite sits on the axis point (sprite.center),
+     * so the offset from the axis stays the same in pixels at any zoom.
+     */
+    makeAxisLabel(text, x, z, anchorX, anchorY) {
+      const canvas = document.createElement('canvas')
+      canvas.width = 128
+      canvas.height = 64
+      const ctx = canvas.getContext('2d')
+      ctx.font = 'bold 48px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      // a light outline keeps the digits readable over the grid lines and the toolpath
+      ctx.lineWidth = 6
+      ctx.strokeStyle = '#eaeaea'
+      ctx.strokeText(text, 64, 32)
+      ctx.fillStyle = '#444444'
+      ctx.fillText(text, 64, 32)
+
+      const material = new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(canvas),
+        depthTest: false, // always visible, also above the 3D part
+        transparent: true
+      })
+      const sprite = new THREE.Sprite(material)
+      sprite.position.set(x, 0, z)
+      sprite.center.set(anchorX, anchorY)
+      sprite.renderOrder = 10
+      return sprite
+    },
+
+    /**
+     * Keeps the labels the same size on the screen: world units per pixel of the orthographic camera
+     * depends on camera.zoom, so every sprite is rescaled to LABEL_HEIGHT_PX pixels.
+     */
+    updateAxisLabels() {
+      if (!this.axisLabels) return
+      const LABEL_HEIGHT_PX = 20
+      const worldPerPixel =
+        (this.camera.top - this.camera.bottom) /
+        this.camera.zoom /
+        this.renderer.domElement.clientHeight
+      const height = LABEL_HEIGHT_PX * worldPerPixel
+      // the texture is 128 x 64, so the sprite is twice as wide as it is high
+      this.axisLabels.children.forEach(sprite => sprite.scale.set(height * 2, height, 1))
+    },
+
     render: function () {
       this.controls.update()
+      this.updateAxisLabels()
 
       this.renderer.render(this.scene, this.camera)
       this.arrowRenderer.render(this.arrowScene, this.arrowCamera)
