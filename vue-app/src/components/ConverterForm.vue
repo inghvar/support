@@ -471,7 +471,11 @@ F
         </v-btn>
       </v-card-title>
       <v-card-text>
-        <ThreeCanvasHelp :gcode-source="generatedGcodeText" :carving-preview="carvingPreview" />
+        <ThreeCanvasHelp
+          :gcode-source="generatedGcodeText"
+          :carving-preview="carvingPreview"
+          :engraving-tool="engravingTool"
+        />
       </v-card-text>
     </v-card>
   </div>
@@ -525,6 +529,7 @@ const engravingToolType = ref('flat')
 const engravingToolDiameter = ref('')
 const toolAngle = ref('')
 const carvingPreview = ref(null)
+const engravingTool = ref(null)
 const DEFAULT_RELIEF_HEIGHT = 8 // mm, fits the default thickness of 10 mm
 const MAX_PLATFORM_CUT = 90 // percent, the same limit as on the server
 const MIN_BOTTOM_THICKNESS = 2 // mm of material that must stay above the table
@@ -974,6 +979,7 @@ const submit = async () => {
   console.log('submit!')
   showCanvas.value = false
   carvingPreview.value = null
+  engravingTool.value = null
   carvingFiles.value = []
 
   reliefTouched.value = true
@@ -1050,6 +1056,11 @@ const converter = async () => {
     }
     if (engravingToolType.value === 'vbit' && toolAngle.value !== '') {
       formData.append('tool_angle', toolAngle.value)
+    }
+    engravingTool.value = {
+      type: engravingToolType.value,
+      diameter: parseFloat(engravingToolDiameter.value) || 3,
+      angle: parseFloat(toolAngle.value) || 60,
     }
   }
 

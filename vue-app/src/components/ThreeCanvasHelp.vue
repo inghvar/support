@@ -5,7 +5,7 @@
 
     <div class="view-buttons">
       <v-btn-toggle
-        v-if="carvingPreview"
+        v-if="hasPart"
         v-model="carvingView"
         mandatory
         class="mr-4 carving-view-toggle"
@@ -60,10 +60,95 @@ import {
   checkPositioningSystem,
   linearInterpolationIncremental
 } from '../assets/js/gcodeParse'
+import {
+  BASE_THICKNESS_MM,
+  buildDepthField,
+  parseCuttingSegments
+} from '../assets/js/engravingSurface'
 
 import TopIcon from './TopIcon.vue'
 import FrontIcon from './FrontIcon.vue'
 import IsometricIcon from './IsometricIcon.vue'
+
+const ENGRAVING_VERTEX_SHADER = `
+  varying vec3 vWorld;
+  void main () {
+    vec4 world = modelMatrix * vec4(position, 1.0);
+    vWorld = world.xyz;
+    gl_Position = projectionMatrix * viewMatrix * world;
+  }
+`
+
+// The top face is the plane y = 0. A ray that meets it above a groove is
+// followed down until it reaches the bottom or the wall of the groove.
+const ENGRAVING_FRAGMENT_SHADER = `
+  uniform mat4 projectionMatrix;
+  uniform sampler2D uDepth;
+  uniform vec2 uOrigin;
+  uniform vec2 uSize;
+  uniform float uPixel;
+  uniform float uMaxDepth;
+  uniform vec3 uColor;
+  uniform vec3 uLight;
+  varying vec3 vWorld;
+
+  // depth of the groove under the point (x, z); machine Y = -z
+  float depthAt (vec2 xz) {
+    vec2 uv = vec2(
+      (xz.x - uOrigin.x) / uSize.x,
+      (-xz.y - uOrigin.y) / uSize.y
+    );
+    return texture2D(uDepth, uv).r;
+  }
+
+  void main () {
+    vec3 dir = projectionMatrix[3][3] == 1.0
+      ? -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2])
+      : normalize(vWorld - cameraPosition);
+
+    vec3 hit = vWorld;
+    float t = 0.0;
+    float grooveDepth = depthAt(vWorld.xz);
+
+    if (grooveDepth > 0.002 && dir.y < -1e-4) {
+      float tMax = (uMaxDepth + 0.01) / -dir.y;
+      float lo = 0.0;
+      float hi = tMax;
+      for (int i = 1; i <= 160; i++) {
+        float ti = tMax * float(i) / 160.0;
+        vec3 p = vWorld + dir * ti;
+        if (-p.y > depthAt(p.xz)) {
+          hi = ti;
+          break;
+        }
+        lo = ti;
+      }
+      for (int i = 0; i < 12; i++) {
+        float mid = 0.5 * (lo + hi);
+        vec3 p = vWorld + dir * mid;
+        if (-p.y > depthAt(p.xz)) hi = mid; else lo = mid;
+      }
+      t = hi;
+      hit = vWorld + dir * t;
+    }
+
+    vec3 normal = vec3(0.0, 1.0, 0.0);
+    float shade = 1.0;
+    if (t > 0.0) {
+      vec2 e = vec2(uPixel, 0.0);
+      float dx = depthAt(hit.xz + e.xy) - depthAt(hit.xz - e.xy);
+      float dz = depthAt(hit.xz + e.yx) - depthAt(hit.xz - e.yx);
+      normal = normalize(vec3(dx, 2.0 * uPixel, dz));
+      shade = 1.0 - 0.25 * clamp(depthAt(hit.xz) / uMaxDepth, 0.0, 1.0);
+    }
+
+    float light = 0.55 + 0.8 * max(dot(normal, uLight), 0.0);
+    gl_FragColor = vec4(uColor * light * shade, 1.0);
+
+    vec4 clip = projectionMatrix * viewMatrix * vec4(hit, 1.0);
+    gl_FragDepth = (clip.z / clip.w) * 0.5 + 0.5;
+  }
+`
 
 export default {
   name: 'ThreeCanvasHelp',
@@ -73,6 +158,12 @@ export default {
     },
     // carved part surface from the backend; when set, the part is shown first
     carvingPreview: {
+      type: Object,
+      default: null
+    },
+    // tool of the engraving { type, diameter, angle }; the grooves are
+    // calculated here from the G-code
+    engravingTool: {
       type: Object,
       default: null
     }
@@ -85,6 +176,7 @@ export default {
   data() {
     return {
       carvingView: 'part',
+      hasPart: false,
       toolpathLoaded: false,
 
       progress: null,
@@ -121,10 +213,16 @@ export default {
     this.tmpStartVec = null
     this.tmpEndVec = null
 
-    if (this.carvingPreview) {
+    if (this.carvingPreview || this.engravingTool) {
       this.initThree()
-      this.buildPart()
+      this.hasPart = this.carvingPreview
+        ? (this.buildPart(), true)
+        : this.buildEngravingPart()
       this.animate()
+      if (this.hasPart) return
+      this.isLongGcode = this.gcodeSource.split('\n').length > 10000
+      this.dialogp = this.isLongGcode
+      this.editorRun()
       return
     }
 
@@ -173,6 +271,13 @@ export default {
      */
     buildPart() {
       const { rows, cols, dx, dy, thickness } = this.carvingPreview
+      // optional: grid offset and Z of the workpiece top (engraving, Z0 = top)
+      const x0 = this.carvingPreview.x0 || 0
+      const y0 = this.carvingPreview.y0 || 0
+      const topZ =
+        this.carvingPreview.top_z !== undefined
+          ? this.carvingPreview.top_z
+          : thickness
 
       const bytes = Uint8Array.from(atob(this.carvingPreview.depth), c =>
         c.charCodeAt(0)
@@ -196,9 +301,9 @@ export default {
       for (let r = 0; r < nr; r++) {
         for (let c = 0; c < nc; c++) {
           const o = (r * nc + c) * 3
-          top[o] = colIdx[c] * dx
-          top[o + 1] = thickness - depth[rowIdx[r] * cols + colIdx[c]] * k
-          top[o + 2] = -rowIdx[r] * dy
+          top[o] = x0 + colIdx[c] * dx
+          top[o + 1] = topZ - depth[rowIdx[r] * cols + colIdx[c]] * k
+          top[o + 2] = -(y0 + rowIdx[r] * dy)
         }
       }
 
@@ -223,7 +328,7 @@ export default {
       topGeometry.computeVertexNormals()
 
       // side walls and bottom of the workpiece
-      const bottomY = 0
+      const bottomY = topZ - thickness
       const wall = []
       const addWall = (p0, p1) => {
         wall.push(
@@ -247,11 +352,13 @@ export default {
         addWall(vertex(r, 0), vertex(r + 1, 0))
         addWall(vertex(r, nc - 1), vertex(r + 1, nc - 1))
       }
-      const xMax = (cols - 1) * dx
-      const zMin = -(rows - 1) * dy
+      const xMin = x0
+      const zMax = -y0
+      const xMax = x0 + (cols - 1) * dx
+      const zMin = -(y0 + (rows - 1) * dy)
       wall.push(
-        0, bottomY, 0, xMax, bottomY, 0, xMax, bottomY, zMin,
-        0, bottomY, 0, xMax, bottomY, zMin, 0, bottomY, zMin
+        xMin, bottomY, zMax, xMax, bottomY, zMax, xMax, bottomY, zMin,
+        xMin, bottomY, zMax, xMax, bottomY, zMin, xMin, bottomY, zMin
       )
       const wallGeometry = new THREE.BufferGeometry()
       wallGeometry.setAttribute(
@@ -276,6 +383,109 @@ export default {
       sun.position.set(-300, 600, 400)
       this.partGroup.add(sun)
       this.scene.add(this.partGroup)
+    },
+
+    /**
+     * Builds the engraved part: a flat top face whose grooves are traced per
+     * pixel in the shader from the depth map, so their walls stay smooth at
+     * any zoom, and the side walls of the plate.
+     * Returns false when the G-code cuts nothing.
+     */
+    buildEngravingPart() {
+      const tool = {
+        type: this.engravingTool.type,
+        diameter: this.engravingTool.diameter,
+        angle: this.engravingTool.angle
+      }
+      const field = buildDepthField(
+        parseCuttingSegments(this.gcodeSource),
+        tool,
+        Math.min(4096, this.renderer.capabilities.maxTextureSize)
+      )
+      if (!field) return false
+
+      const { depth, cols, rows, x0, y0, pixel, maxDepth } = field
+      const half = new Uint16Array(depth.length)
+      for (let i = 0; i < depth.length; i++) {
+        if (depth[i] > 0) half[i] = THREE.DataUtils.toHalfFloat(depth[i])
+      }
+      const texture = new THREE.DataTexture(
+        half,
+        cols,
+        rows,
+        THREE.RedFormat,
+        THREE.HalfFloatType
+      )
+      texture.minFilter = THREE.LinearFilter
+      texture.magFilter = THREE.LinearFilter
+      texture.generateMipmaps = false
+      texture.needsUpdate = true
+
+      const width = cols * pixel
+      const height = rows * pixel
+      const thickness = maxDepth + BASE_THICKNESS_MM
+      const xMax = x0 + width
+      const zMax = -y0
+      const zMin = -(y0 + height)
+
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          uDepth: { value: texture },
+          uOrigin: { value: new THREE.Vector2(x0, y0) },
+          uSize: { value: new THREE.Vector2(width, height) },
+          uPixel: { value: pixel },
+          uMaxDepth: { value: maxDepth },
+          uColor: { value: new THREE.Color(0xd9b382) },
+          uLight: { value: new THREE.Vector3(-300, 600, 400).normalize() }
+        },
+        vertexShader: ENGRAVING_VERTEX_SHADER,
+        fragmentShader: ENGRAVING_FRAGMENT_SHADER
+      })
+      const top = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, height),
+        material
+      )
+      top.rotation.x = -Math.PI / 2
+      top.position.set(x0 + width / 2, 0, (zMax + zMin) / 2)
+
+      const bottomY = -thickness
+      const quad = (a, b, c, d) => [...a, ...b, ...c, ...a, ...c, ...d]
+      const side = new THREE.BufferGeometry()
+      side.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(
+          [
+            ...quad([x0, 0, zMax], [xMax, 0, zMax], [xMax, bottomY, zMax], [x0, bottomY, zMax]),
+            ...quad([xMax, 0, zMax], [xMax, 0, zMin], [xMax, bottomY, zMin], [xMax, bottomY, zMax]),
+            ...quad([xMax, 0, zMin], [x0, 0, zMin], [x0, bottomY, zMin], [xMax, bottomY, zMin]),
+            ...quad([x0, 0, zMin], [x0, 0, zMax], [x0, bottomY, zMax], [x0, bottomY, zMin]),
+            ...quad([x0, bottomY, zMax], [xMax, bottomY, zMax], [xMax, bottomY, zMin], [x0, bottomY, zMin])
+          ],
+          3
+        )
+      )
+      side.computeVertexNormals()
+
+      this.partGroup = new THREE.Group()
+      this.partGroup.add(top)
+      this.partGroup.add(
+        new THREE.Mesh(
+          side,
+          new THREE.MeshStandardMaterial({
+            color: 0xd9b382,
+            roughness: 0.8,
+            metalness: 0,
+            side: THREE.DoubleSide
+          })
+        )
+      )
+      // Three.js r155+ no longer scales light intensity by PI
+      this.partGroup.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
+      const sun = new THREE.DirectionalLight(0xffffff, 0.8 * Math.PI)
+      sun.position.set(-300, 600, 400)
+      this.partGroup.add(sun)
+      this.scene.add(this.partGroup)
+      return true
     },
 
     initThree() {
@@ -463,7 +673,7 @@ export default {
       this.linesInterpolation.geometry.attributes.position.needsUpdate = true
       this.dotsInterpolation = new THREE.Points(pointsGeometry, dotMaterial)
 
-      if (this.carvingPreview && this.carvingView === 'part') {
+      if (this.hasPart && this.carvingView === 'part') {
         this.linesInterpolation.visible = false
         this.dotsInterpolation.visible = false
       }
