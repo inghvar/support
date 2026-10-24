@@ -74,3 +74,17 @@ export function betweenRule (minMm, maxMm, unit, suffix = 'mm') {
 export function gcodeScale (unit) {
   return unit === UNIT_INCH ? MM_PER_INCH : 1
 }
+
+// The common cutter diameters in inches: [fraction, decimal value sent to the server]
+export const TOOL_DIAMETERS_INCH = [
+  ['1/64', 0.015625],
+  ['1/32', 0.03125],
+  ['1/16', 0.0625],
+  ['3/32', 0.09375],
+  ['1/8', 0.125],
+  ['3/16', 0.1875],
+  ['1/4', 0.25],
+  ['5/16', 0.3125],
+  ['3/8', 0.375],
+  ['1/2', 0.5]
+]

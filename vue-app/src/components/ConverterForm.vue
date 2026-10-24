@@ -186,7 +186,17 @@
               class="my-2"
             ></v-select>
 
+            <v-select
+              v-if="inches"
+              v-model="roughToolDiameter"
+              :items="toolDiameterItems"
+              :label="tu('Rough tool: diameter (mm)')"
+              clearable
+              variant="outlined"
+              class="my-2"
+            ></v-select>
             <v-text-field
+              v-else
               v-model.number="roughToolDiameter"
               :label="tu('Rough tool: diameter (mm)')"
               :rules="toolDiameterRules"
@@ -204,7 +214,17 @@
             class="my-2"
           ></v-select>
 
+          <v-select
+            v-if="inches"
+            v-model="toolDiameter"
+            :items="toolDiameterItems"
+            :label="tu(carvingStage === 'rough_finish' ? 'Finish tool: diameter (mm)' : 'Tool diameter (default 3 mm)', 0.125)"
+            clearable
+            variant="outlined"
+            class="my-2"
+          ></v-select>
           <v-text-field
+            v-else
             v-model.number="toolDiameter"
             :label="tu(carvingStage === 'rough_finish' ? 'Finish tool: diameter (mm)' : 'Tool diameter (default 3 mm)', 0.125)"
             :rules="toolDiameterRules"
@@ -294,7 +314,17 @@
             class="my-2"
           ></v-select>
 
+          <v-select
+            v-if="inches"
+            v-model="engravingToolDiameter"
+            :items="toolDiameterItems"
+            :label="tu(engravingToolType === 'vbit' ? 'V-bit diameter (maximum cutting diameter, default 3 mm)' : 'Tool diameter (default 3 mm)', 0.125)"
+            clearable
+            variant="outlined"
+            class="my-2"
+          ></v-select>
           <v-text-field
+            v-else
             v-model.number="engravingToolDiameter"
             :label="tu(engravingToolType === 'vbit' ? 'V-bit diameter (maximum cutting diameter, default 3 mm)' : 'Tool diameter (default 3 mm)', 0.125)"
             :rules="toolDiameterRules"
@@ -506,7 +536,7 @@ import ThreeCanvasHelp from './ThreeCanvasHelp.vue'
 import { sendMessage, CLIENT_HEADERS } from '../vscodeApi'
 import UnitSwitch from './UnitSwitch.vue'
 import { useUnitSystem } from '../composables/useUnitSystem'
-import { unitToMm } from '../assets/js/units'
+import { unitToMm, TOOL_DIAMETERS_INCH } from '../assets/js/units'
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
@@ -620,6 +650,21 @@ const workpieceThicknessRules = computed(() => limits([['ge', 5]]))
 const stepDepthRules = [(value) => !value || value > 0 || 'Value should be greater than 0']
 
 const stepoverRules = computed(() => [between(0.1, 5)])
+
+// the common cutter diameters in inches: a fraction and the decimal value sent to the server
+const toolDiameterItems = TOOL_DIAMETERS_INCH.map(([text, value]) => ({
+  title: `${text}" (${value})`,
+  value,
+}))
+
+const filled = (value) => value !== '' && value !== null && value !== undefined
+
+// a diameter typed in one unit system is meaningless in the other
+watch(unit, () => {
+  engravingToolDiameter.value = ''
+  toolDiameter.value = ''
+  roughToolDiameter.value = ''
+})
 
 const toolDiameterRules = computed(() => [between(0.1, 25)])
 
@@ -1068,7 +1113,7 @@ const converter = async () => {
     formData.append('processing_stage', carvingStage.value)
     if (carvingStage.value === 'rough_finish') {
       formData.append('rough_tool_type', roughToolType.value)
-      if (roughToolDiameter.value !== '') {
+      if (filled(roughToolDiameter.value)) {
         formData.append('rough_tool_diameter', roughToolDiameter.value)
       }
     }
@@ -1078,11 +1123,11 @@ const converter = async () => {
     if (stepover.value !== '') formData.append('stepover', stepover.value)
     formData.append('tool_type', toolType.value)
     formData.append('relief_enhance', 'true')
-    if (toolDiameter.value !== '') formData.append('tool_diameter', toolDiameter.value)
+    if (filled(toolDiameter.value)) formData.append('tool_diameter', toolDiameter.value)
   }
   if (mode.value === 'ME') {
     formData.append('tool_type', engravingToolType.value)
-    if (engravingToolDiameter.value !== '') {
+    if (filled(engravingToolDiameter.value)) {
       formData.append('tool_diameter', engravingToolDiameter.value)
     }
     if (engravingToolType.value === 'vbit' && toolAngle.value !== '') {

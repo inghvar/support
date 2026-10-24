@@ -11,7 +11,7 @@
       <v-form ref="form" @submit.prevent="submit">
         <UnitSwitch v-model="unit" />
 
-        <hr />
+        <hr class="mb-6" />
 
         <v-row class="mt-4">
           <v-file-input

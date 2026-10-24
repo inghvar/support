@@ -1196,7 +1196,7 @@ export default {
       this.unitScale = 1
       const promises = []
       const lineCount = lines.length
-      for (let i = 1; i <= lineCount; i++) {
+      for (let i = 0; i < lineCount; i++) {
         promises.push(this.longTask(i, lines[i]))
         processed++
         if (lineCount > 100000 && !(i % 100000)) {
