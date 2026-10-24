@@ -238,6 +238,12 @@ export default {
     if (this.partGroup) {
       this.disposePart()
     }
+    if (this.axisLabels) {
+      this.axisLabels.children.forEach(sprite => {
+        sprite.material.map.dispose()
+        sprite.material.dispose()
+      })
+    }
     if (this.renderer) this.renderer.dispose()
     if (this.arrowRenderer) this.arrowRenderer.dispose()
   },
@@ -536,6 +542,7 @@ export default {
       this.gridHelper.material.opacity = 0.4
       this.gridHelper.material.transparent = true
       this.scene.add(this.gridHelper)
+      this.buildAxisLabels()
 
       // ---------------------- inset arrow canvas ----------------------
 
@@ -939,8 +946,84 @@ export default {
       }
     },
 
+    /**
+     * Puts the coordinate numbers (in mm) along the X and Y axes of the grid.
+     * The mapping is the same as for the toolpath: machine X -> three x, machine Y -> three -z,
+     * so the label of a point at three z is -z. Labels are sprites; their size in pixels is
+     * kept constant by updateAxisLabels(), because the orthographic camera is zoomed by camera.zoom.
+     */
+    buildAxisLabels() {
+      const half = 400 // half of the grid size (the grid is 800 x 800 mm)
+      const step = 50 // distance between the labels, in mm
+      this.axisLabels = new THREE.Group()
+
+      for (let v = -half; v <= half; v += step) {
+        // the origin is labeled once, below and to the left of the point
+        if (v === 0) {
+          this.axisLabels.add(this.makeAxisLabel('0', 0, 0, 1.15, 1.15))
+          continue
+        }
+        // X axis: the label hangs below the axis point
+        this.axisLabels.add(this.makeAxisLabel(String(v), v, 0, 0.5, 1.15))
+        // Y axis: the label is to the left of the axis point; three z = -machine Y
+        this.axisLabels.add(this.makeAxisLabel(String(v), 0, -v, 1.15, 0.5))
+      }
+
+      this.scene.add(this.axisLabels)
+      this.updateAxisLabels()
+    },
+
+    /**
+     * Creates one text sprite lying on the grid plane (y = 0) at the three.js point (x, 0, z).
+     * anchorX/anchorY set which point of the sprite sits on the axis point (sprite.center),
+     * so the offset from the axis stays the same in pixels at any zoom.
+     */
+    makeAxisLabel(text, x, z, anchorX, anchorY) {
+      const canvas = document.createElement('canvas')
+      canvas.width = 128
+      canvas.height = 64
+      const ctx = canvas.getContext('2d')
+      ctx.font = 'bold 48px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      // a light outline keeps the digits readable over the grid lines and the toolpath
+      ctx.lineWidth = 6
+      ctx.strokeStyle = '#eaeaea'
+      ctx.strokeText(text, 64, 32)
+      ctx.fillStyle = '#444444'
+      ctx.fillText(text, 64, 32)
+
+      const material = new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(canvas),
+        depthTest: false, // always visible, also above the 3D part
+        transparent: true
+      })
+      const sprite = new THREE.Sprite(material)
+      sprite.position.set(x, 0, z)
+      sprite.center.set(anchorX, anchorY)
+      sprite.renderOrder = 10
+      return sprite
+    },
+
+    /**
+     * Keeps the labels the same size on the screen: world units per pixel of the orthographic camera
+     * depends on camera.zoom, so every sprite is rescaled to LABEL_HEIGHT_PX pixels.
+     */
+    updateAxisLabels() {
+      if (!this.axisLabels) return
+      const LABEL_HEIGHT_PX = 20
+      const worldPerPixel =
+        (this.camera.top - this.camera.bottom) /
+        this.camera.zoom /
+        this.renderer.domElement.clientHeight
+      const height = LABEL_HEIGHT_PX * worldPerPixel
+      // the texture is 128 x 64, so the sprite is twice as wide as it is high
+      this.axisLabels.children.forEach(sprite => sprite.scale.set(height * 2, height, 1))
+    },
+
     render: function () {
       this.controls.update()
+      this.updateAxisLabels()
 
       this.renderer.render(this.scene, this.camera)
       this.arrowRenderer.render(this.arrowScene, this.arrowCamera)
