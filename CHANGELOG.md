@@ -1,3 +1,10 @@
+Version 0.4.2: October 24, 2026
+
+Enhancements
+- Milling, Laser, Pen Plotter: switch between millimeters and inches, tool diameter list in inches.
+- G-code viewer: G-code in inches is shown correctly, axis numbers in inches.
+
+
 Version 0.4.1: October 24, 2026
 
 Enhancements
