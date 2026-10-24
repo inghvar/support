@@ -9,7 +9,9 @@
       <p>Supports image format .jpeg .png .svg</p>
 
       <v-form ref="form" @submit.prevent="submit">
-        <hr />
+        <UnitSwitch v-model="unit" />
+
+        <hr class="mb-6" />
 
         <v-row class="mt-4">
           <v-file-input
@@ -92,7 +94,7 @@
               v-model="height"
               :error-messages="heightErrors"
               :rules="heightRules"
-              label="Height (mm)"
+              :label="tu('Height (mm)')"
               outlined
               @input="v$.height.$touch()"
             />
@@ -106,7 +108,7 @@
               v-model="width"
               :error-messages="widthErrors"
               :rules="widthRules"
-              label="Width (mm)"
+              :label="tu('Width (mm)')"
               outlined
               @input="v$.width.$touch()"
             />
@@ -120,7 +122,7 @@
               v-model="tolerance"
               :error-messages="toleranceErrors"
               :rules="toleranceRules"
-              label="Tolerance (default 0.2 mm)"
+              :label="tu('Tolerance (default 0.2 mm)', 0.01)"
               outlined
               @input="v$.tolerance.$touch()"
             />
@@ -149,7 +151,7 @@
               v-model="feedSpeed"
               :rules="rapidRules"
               :error-messages="feedErrors"
-              label="Movement Speed, pen up (default 3000 mm/min)"
+              :label="tu('Movement Speed, pen up (default 3000 mm/min)', 120)"
               outlined
               @input="v$.feedSpeed.$touch()"
             />
@@ -162,7 +164,7 @@
               v-model="drawingSpeed"
               :rules="drawingRules"
               :error-messages="drawingErrors"
-              label="Drawing Speed, pen down (default 1500 mm/min)"
+              :label="tu('Drawing Speed, pen down (default 1500 mm/min)', 60)"
               outlined
               @input="v$.drawingSpeed.$touch()"
             />
@@ -175,7 +177,7 @@
               v-model="penUpZ"
               :rules="penUpZRules"
               :error-messages="penUpZErrors"
-              label="Pen Up Z - height of raised pen (default 5 mm)"
+              :label="tu('Pen Up Z - height of raised pen (default 5 mm)', 0.2)"
               outlined
               @input="v$.penUpZ.$touch()"
             />
@@ -188,7 +190,7 @@
               v-model="penDownZ"
               :rules="penDownZRules"
               :error-messages="penDownZErrors"
-              label="Pen Down Z - working height of pen (default 0 mm)"
+              :label="tu('Pen Down Z - working height of pen (default 0 mm)', 0)"
               outlined
               @input="v$.penDownZ.$touch()"
             />
@@ -278,6 +280,9 @@ import { useVuelidate } from '@vuelidate/core'
 import { decimal, numeric, required, requiredIf } from '@vuelidate/validators'
 import ThreeCanvasHelp from './ThreeCanvasHelp.vue'
 import { sendMessage, CLIENT_HEADERS } from '../vscodeApi'
+import UnitSwitch from './UnitSwitch.vue'
+import { useUnitSystem } from '../composables/useUnitSystem'
+import { mmToUnit, formatNumber } from '../assets/js/units'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 const LONG_GCODE_LINES = 50000
@@ -288,6 +293,8 @@ const props = defineProps({
     default: '',
   },
 })
+
+const { unit, inches, tu, rules: limits, between } = useUnitSystem()
 
 const imageUrl = ref('')
 const feedSpeed = ref('')
@@ -339,47 +346,40 @@ const fileInputRules = [
     'This type of file not accepted!',
 ]
 
-const drawingRules = [
-  (value) => !value || value < 6000 || 'Value should be less than 6000',
-  (value) => !value || value > 10 || 'Value should be greater than 10',
-]
+const drawingRules = computed(() => limits([['lt', 6000], ['gt', 10]], 'mm/min'))
 
-const rapidRules = [
-  (value) => !value || value < 10000 || 'Value should be less than 10000',
-  (value) => !value || value > 100 || 'Value should be greater than 100',
-]
+const rapidRules = computed(() => limits([['lt', 10000], ['gt', 100]], 'mm/min'))
 
-const toleranceRules = [
-  (value) => !value || value <= 5 || 'Value should be less than 5',
-  (value) => !value || value >= 0.01 || 'Value should be greater or equal 0.01',
-]
+const toleranceRules = computed(() => limits([['le', 5], ['ge', 0.01]]))
 
-const penUpZRules = [
-  (value) => !value || (value >= 0.1 && value <= 50) || 'Value should be between 0.1 and 50',
-]
+const penUpZRules = computed(() => [between(0.1, 50)])
 
-const penDownZRules = [
-  (value) =>
-    value === '' || value === null || (value >= -5 && value <= 5) || 'Value should be between -5 and 5',
-]
+const penDownZRules = computed(() => {
+  const min = mmToUnit(-5, unit.value)
+  const max = mmToUnit(5, unit.value)
+  const message = `Value should be between ${formatNumber(min)} and ${formatNumber(max)} ${inches.value ? 'in' : 'mm'}`
+  return [
+    (value) => value === '' || value === null || (value >= min && value <= max) || message,
+  ]
+})
 
-const heightRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
+const heightRules = computed(() => limits([['gt', 9]]))
 
-const widthRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
+const widthRules = computed(() => limits([['gt', 9]]))
 
 const rules = {
   file: { required },
-  feedSpeed: { numeric },
-  drawingSpeed: { numeric },
+  feedSpeed: { decimal },
+  drawingSpeed: { decimal },
   penUpZ: { decimal },
   penDownZ: { decimal },
   maxSize: { numeric },
   height: {
-    numeric,
+    decimal,
     heightWithWidth: (value) => (!!value && !!width.value) || (!value && !width.value),
   },
   width: {
-    numeric,
+    decimal,
     widthWithHeight: (value) => (!!value && !!height.value) || (!value && !height.value),
   },
   tolerance: { decimal },
@@ -429,7 +429,7 @@ const toleranceErrors = computed(() => numberError('tolerance'))
 const heightErrors = computed(() => {
   const errors = []
   if (!v$.value.height.$dirty) return errors
-  if (v$.value.height.numeric.$invalid) errors.push('Only numbers are allowed.')
+  if (v$.value.height.decimal.$invalid) errors.push('Only numbers are allowed.')
   if (v$.value.height.heightWithWidth.$invalid) errors.push('Fill both height and width.')
   return errors
 })
@@ -437,7 +437,7 @@ const heightErrors = computed(() => {
 const widthErrors = computed(() => {
   const errors = []
   if (!v$.value.width.$dirty) return errors
-  if (v$.value.width.numeric.$invalid) errors.push('Only numbers are allowed.')
+  if (v$.value.width.decimal.$invalid) errors.push('Only numbers are allowed.')
   if (v$.value.width.widthWithHeight.$invalid) errors.push('Fill both height and width.')
   return errors
 })
@@ -545,6 +545,7 @@ const parseFileName = (contentDisposition) => {
 const Converter = () => {
   const formData = new FormData()
 
+  formData.append('unit', unit.value)
   if (feedSpeed.value !== '') formData.append('movement_speed', feedSpeed.value)
   if (drawingSpeed.value !== '') formData.append('drawing_speed', drawingSpeed.value)
   if (penUpZ.value !== '') formData.append('pen_up_z', penUpZ.value)

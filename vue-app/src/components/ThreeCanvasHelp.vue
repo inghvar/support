@@ -58,6 +58,8 @@ import {
   checkUsedGcode,
   checkPlaneMode,
   checkPositioningSystem,
+  checkUnitSystem,
+  scaleLine,
   linearInterpolationIncremental
 } from '../assets/js/gcodeParse'
 import {
@@ -185,7 +187,9 @@ export default {
 
       coordinateX: 0,
       coordinateY: 0,
-      coordinateZ: 0
+      coordinateZ: 0,
+      unitScale: 1, // 25.4 while the G-code is in inches (G20), the scene is drawn in mm
+      axisUnit: 'mm'
     }
   },
   mounted() {
@@ -947,14 +951,17 @@ export default {
     },
 
     /**
-     * Puts the coordinate numbers (in mm) along the X and Y axes of the grid.
+     * Puts the coordinate numbers (in mm or inches) along the X and Y axes of the grid.
      * The mapping is the same as for the toolpath: machine X -> three x, machine Y -> three -z,
      * so the label of a point at three z is -z. Labels are sprites; their size in pixels is
      * kept constant by updateAxisLabels(), because the orthographic camera is zoomed by camera.zoom.
      */
-    buildAxisLabels() {
-      const half = 400 // half of the grid size (the grid is 800 x 800 mm)
-      const step = 50 // distance between the labels, in mm
+    buildAxisLabels(unit = 'mm') {
+      const inches = unit === 'in'
+      const half = inches ? 14 : 400 // the grid is 800 x 800 mm, 14 in is inside of it
+      const step = inches ? 2 : 50 // distance between the labels
+      const mmPer = inches ? 25.4 : 1 // the scene is in mm
+      this.axisUnit = unit
       this.axisLabels = new THREE.Group()
 
       for (let v = -half; v <= half; v += step) {
@@ -964,13 +971,26 @@ export default {
           continue
         }
         // X axis: the label hangs below the axis point
-        this.axisLabels.add(this.makeAxisLabel(String(v), v, 0, 0.5, 1.15))
+        this.axisLabels.add(this.makeAxisLabel(String(v), v * mmPer, 0, 0.5, 1.15))
         // Y axis: the label is to the left of the axis point; three z = -machine Y
-        this.axisLabels.add(this.makeAxisLabel(String(v), 0, -v, 1.15, 0.5))
+        this.axisLabels.add(this.makeAxisLabel(String(v), 0, -v * mmPer, 1.15, 0.5))
       }
 
       this.scene.add(this.axisLabels)
       this.updateAxisLabels()
+    },
+
+    // Redraws the axis labels when the G-code switches between mm and inches
+    setAxisUnit(unit) {
+      if (unit === this.axisUnit) return
+      if (this.axisLabels) {
+        this.scene.remove(this.axisLabels)
+        this.axisLabels.children.forEach(sprite => {
+          sprite.material.map.dispose()
+          sprite.material.dispose()
+        })
+      }
+      this.buildAxisLabels(unit)
     },
 
     /**
@@ -1049,6 +1069,14 @@ export default {
       if (checkUsedGcode(line)) {
         // prepare line
         line = prepareGcode(line)
+        // check units, the numbers of an inch G-code are scaled to mm for the scene
+        const unitSystem = checkUnitSystem(line)
+        if (unitSystem) {
+          this.unitScale = unitSystem === 'G20' ? 25.4 : 1
+        }
+        if (this.unitScale !== 1) {
+          line = scaleLine(line, this.unitScale)
+        }
         // check positioning system
         const positioningSystem = checkPositioningSystem(line)
         if (positioningSystem && positioningSystem !== this.positioningSystem) {
@@ -1165,9 +1193,10 @@ export default {
       const lines = this.gcodeSource.split('\n')
       // console.log(lines)
       this.pointsPath = new THREE.CurvePath()
+      this.unitScale = 1
       const promises = []
       const lineCount = lines.length
-      for (let i = 1; i <= lineCount; i++) {
+      for (let i = 0; i < lineCount; i++) {
         promises.push(this.longTask(i, lines[i]))
         processed++
         if (lineCount > 100000 && !(i % 100000)) {
@@ -1177,6 +1206,7 @@ export default {
         }
       }
       await Promise.all(promises)
+      this.setAxisUnit(this.unitScale === 1 ? 'mm' : 'in')
       clearInterval(progressTimer)
       this.progress = 100
       this.dialogp = false
