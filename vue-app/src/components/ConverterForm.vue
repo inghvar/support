@@ -271,6 +271,35 @@ F
           ></v-text-field>
         </div>
 
+        <template v-if="mode === 'ME'">
+          <v-select
+            v-model="engravingToolType"
+            :items="engravingToolTypeItems"
+            label="Tool type"
+            variant="outlined"
+            class="my-2"
+          ></v-select>
+
+          <v-text-field
+            v-model.number="engravingToolDiameter"
+            :label="engravingToolType === 'vbit' ? 'V-bit diameter (maximum cutting diameter, default 3 mm)' : 'Tool diameter (default 3 mm)'"
+            :rules="toolDiameterRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+
+          <v-text-field
+            v-if="engravingToolType === 'vbit'"
+            v-model.number="toolAngle"
+            label="V-bit angle, degrees (default 60)"
+            :rules="toolAngleRules"
+            type="number"
+            variant="outlined"
+            class="my-2"
+          ></v-text-field>
+        </template>
+
         <!-- Tolerance -->
         <p>Set Tolerance (distance between approximation points)</p>
         <v-text-field
@@ -492,6 +521,9 @@ const typeProcessing = ref('out')
 const stepover = ref('')
 const toolType = ref('flat')
 const toolDiameter = ref('')
+const engravingToolType = ref('flat')
+const engravingToolDiameter = ref('')
+const toolAngle = ref('')
 const carvingPreview = ref(null)
 const DEFAULT_RELIEF_HEIGHT = 8 // mm, fits the default thickness of 10 mm
 const MAX_PLATFORM_CUT = 90 // percent, the same limit as on the server
@@ -500,6 +532,7 @@ const toolTypeItems = [
   { title: 'Flat end mill', value: 'flat' },
   { title: 'Ball end mill', value: 'ball' },
 ]
+const engravingToolTypeItems = [...toolTypeItems, { title: 'V-bit', value: 'vbit' }]
 const header = ref('G17\nG90\nG0 X0 Y0\nM3 S800')
 const end = ref('M5')
 const submitStatus = ref('')
@@ -578,6 +611,10 @@ const stepoverRules = [
 
 const toolDiameterRules = [
   (value) => !value || (value >= 0.1 && value <= 25) || 'Value should be between 0.1 and 25',
+]
+
+const toolAngleRules = [
+  (value) => !value || (value >= 10 && value <= 150) || 'Value should be between 10 and 150',
 ]
 
 const passDepthRules = [
@@ -1005,6 +1042,15 @@ const converter = async () => {
     formData.append('tool_type', toolType.value)
     formData.append('relief_enhance', 'true')
     if (toolDiameter.value !== '') formData.append('tool_diameter', toolDiameter.value)
+  }
+  if (mode.value === 'ME') {
+    formData.append('tool_type', engravingToolType.value)
+    if (engravingToolDiameter.value !== '') {
+      formData.append('tool_diameter', engravingToolDiameter.value)
+    }
+    if (engravingToolType.value === 'vbit' && toolAngle.value !== '') {
+      formData.append('tool_angle', toolAngle.value)
+    }
   }
 
   let endpoint = ''
