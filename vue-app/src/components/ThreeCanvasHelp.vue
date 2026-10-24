@@ -615,7 +615,9 @@ export default {
         } else if (this.listModes[i] === 'G1') {
           colors.push(0, 0, 255, 0, 0, 255)
         } else if (this.listModes[i] === 'G2' || this.listModes[i] === 'G3') {
-          for (var k = 0; k <= 20; k++) {
+          // an arc is drawn with 20 vertices (getPoints(19) below), so it needs exactly 20 vertex colors;
+          // each push adds 2 vertices. A larger count shifts the colors of all following segments
+          for (var k = 0; k < 10; k++) {
             colors.push(0, 0, 255, 0, 0, 255)
           }
         }
