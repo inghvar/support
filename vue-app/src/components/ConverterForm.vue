@@ -1,4 +1,3 @@
-F
 <template>
   <h2 class="create-title">G-code generation for milling</h2>
   <v-card class="tool-card" elevation="3">
@@ -7,6 +6,8 @@ F
       <p>Supported formats: PNG, JPEG, SVG, DXF</p>
 
       <v-form ref="form" @submit.prevent="submit">
+        <UnitSwitch v-model="unit" />
+
         <v-divider class="my-4"></v-divider>
 
         <!-- Processing Mode -->
@@ -117,7 +118,7 @@ F
           <v-text-field
             v-model.number="workpieceThickness"
             :error-messages="v$.workpieceThickness.$errors.map((e) => e.$message)"
-            label="Workpiece Thickness (mm)"
+            :label="tu('Workpiece Thickness (mm)')"
             :rules="workpieceThicknessRules"
             :error="!!reliefHeightError"
             type="number"
@@ -128,7 +129,7 @@ F
 
           <v-text-field
             v-model="reliefHeight"
-            label="Relief height, mm (default 8 mm)"
+            :label="tu('Relief height, mm (default 8 mm)', 0.3)"
             hint="Not used for flat figures (drawings): their relief height is fixed."
             :error-messages="reliefHeightError"
             persistent-hint
@@ -139,7 +140,7 @@ F
 
           <v-text-field
             v-model="safeHeight"
-            label="Safe height Z, mm (default: thickness + 5 mm)"
+            :label="tu('Safe height Z, mm (default: thickness + 5 mm)', 0.2)"
             hint="Height above the table the tool retracts to between passes and at the end. Must be greater than the workpiece thickness."
             :error-messages="safeHeightProblem"
             persistent-hint
@@ -160,7 +161,7 @@ F
           <v-text-field
             v-model.number="stepDepth"
             :error-messages="v$.stepDepth.$errors.map((e) => e.$message)"
-            label="Step Depth (mm)"
+            :label="tu('Step Depth (mm)')"
             :rules="stepDepthRules"
             type="number"
             variant="outlined"
@@ -169,7 +170,7 @@ F
 
           <v-text-field
             v-model.number="stepover"
-            label="Horizontal step when moving in a serpentine pattern (default 0.3 mm)"
+            :label="tu('Horizontal step when moving in a serpentine pattern (default 0.3 mm)', 0.01)"
             :rules="stepoverRules"
             type="number"
             variant="outlined"
@@ -187,7 +188,7 @@ F
 
             <v-text-field
               v-model.number="roughToolDiameter"
-              label="Rough tool: diameter (mm)"
+              :label="tu('Rough tool: diameter (mm)')"
               :rules="toolDiameterRules"
               type="number"
               variant="outlined"
@@ -205,7 +206,7 @@ F
 
           <v-text-field
             v-model.number="toolDiameter"
-            :label="carvingStage === 'rough_finish' ? 'Finish tool: diameter (mm)' : 'Tool diameter (default 3 mm)'"
+            :label="tu(carvingStage === 'rough_finish' ? 'Finish tool: diameter (mm)' : 'Tool diameter (default 3 mm)', 0.125)"
             :rules="toolDiameterRules"
             type="number"
             variant="outlined"
@@ -248,7 +249,7 @@ F
           <v-text-field
             v-model.number="height"
             :error-messages="heightErrors"
-            label="Length (mm)"
+            :label="tu('Length (mm)')"
             :rules="heightRules"
             type="number"
             variant="outlined"
@@ -262,7 +263,7 @@ F
           <v-text-field
             v-model.number="width"
             :error-messages="widthErrors"
-            label="Width (mm)"
+            :label="tu('Width (mm)')"
             :rules="widthRules"
             type="number"
             variant="outlined"
@@ -275,7 +276,7 @@ F
           <v-text-field
             v-model.number="workpieceThickness"
             :error-messages="v$.workpieceThickness.$errors.map((e) => e.$message)"
-            label="Workpiece Thickness (default 10 mm)"
+            :label="tu('Workpiece Thickness (default 10 mm)', 0.4)"
             :rules="workpieceThicknessRules"
             :messages="engravingDepthProblem"
             :error="!!engravingDepthProblem"
@@ -295,7 +296,7 @@ F
 
           <v-text-field
             v-model.number="engravingToolDiameter"
-            :label="engravingToolType === 'vbit' ? 'V-bit diameter (maximum cutting diameter, default 3 mm)' : 'Tool diameter (default 3 mm)'"
+            :label="tu(engravingToolType === 'vbit' ? 'V-bit diameter (maximum cutting diameter, default 3 mm)' : 'Tool diameter (default 3 mm)', 0.125)"
             :rules="toolDiameterRules"
             type="number"
             variant="outlined"
@@ -318,7 +319,7 @@ F
         <v-text-field
           v-model.number="tolerance"
           :error-messages="v$.tolerance.$errors.map((e) => e.$message)"
-          label="Tolerance (default 0.2 mm)"
+          :label="tu('Tolerance (default 0.2 mm)', 0.01)"
           :rules="toleranceRules"
           type="number"
           step="0.01"
@@ -330,7 +331,7 @@ F
         <v-text-field
           v-model.number="feedSpeed"
           :error-messages="v$.feedSpeed.$errors.map((e) => e.$message)"
-          label="Rapid Speed (default 300 mm/min)"
+          :label="tu('Rapid Speed (default 300 mm/min)', 12)"
           :rules="rapidRules"
           type="number"
           variant="outlined"
@@ -341,7 +342,7 @@ F
         <v-text-field
           v-model.number="cuttingSpeed"
           :error-messages="v$.cuttingSpeed.$errors.map((e) => e.$message)"
-          label="Cutting Speed (default 150 mm/min)"
+          :label="tu('Cutting Speed (default 150 mm/min)', 6)"
           :rules="cuttingRules"
           type="number"
           variant="outlined"
@@ -353,7 +354,7 @@ F
           v-if="mode !== 'ME'"
           v-model.number="coordinateZ"
           :error-messages="v$.coordinateZ.$errors.map((e) => e.$message)"
-          label="Coordinate Z, cutting tool lifting height (50 mm)"
+          :label="tu('Coordinate Z, cutting tool lifting height (50 mm)', 2)"
           type="number"
           variant="outlined"
           class="my-2"
@@ -364,7 +365,7 @@ F
           v-if="mode === 'ME'"
           v-model.number="cuttingDepth"
           :error-messages="v$.cuttingDepth.$errors.map((e) => e.$message)"
-          label="Cutting depth - total milling depth (default 3 mm)"
+          :label="tu('Cutting depth - total milling depth (default 3 mm)', 0.12)"
           :rules="cuttingDepthRules"
           :messages="cuttingDepthWarnings"
           type="number"
@@ -387,7 +388,7 @@ F
         <v-text-field
           v-model.number="passDepth"
           :error-messages="v$.passDepth.$errors.map((e) => e.$message)"
-          label="Pass Depth (default 1 mm)"
+          :label="tu('Pass Depth (default 1 mm)', 0.04)"
           :rules="passDepthRules"
           type="number"
           variant="outlined"
@@ -503,6 +504,9 @@ import { useVuelidate } from '@vuelidate/core'
 import { required, numeric, decimal, requiredIf } from '@vuelidate/validators'
 import ThreeCanvasHelp from './ThreeCanvasHelp.vue'
 import { sendMessage, CLIENT_HEADERS } from '../vscodeApi'
+import UnitSwitch from './UnitSwitch.vue'
+import { useUnitSystem } from '../composables/useUnitSystem'
+import { unitToMm } from '../assets/js/units'
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
@@ -513,6 +517,8 @@ const props = defineProps({
     required: true,
   },
 })
+
+const { unit, inches, tu, rules: limits, between } = useUnitSystem()
 
 // Data
 const file = ref(null)
@@ -603,72 +609,53 @@ const fileInputRules = [
     'This type of file not accepted',
 ]
 
-const cuttingRules = [
-  (value) => !value || value < 6000 || 'Value should be less than 6000',
-  (value) => !value || value > 10 || 'Value should be greater than 10',
-]
+const cuttingRules = computed(() => limits([['lt', 6000], ['gt', 10]], 'mm/min'))
 
-const rapidRules = [
-  (value) => !value || value < 10000 || 'Value should be less than 10000',
-  (value) => !value || value > 100 || 'Value should be greater than 100',
-]
+const rapidRules = computed(() => limits([['lt', 10000], ['gt', 100]], 'mm/min'))
 
-const toleranceRules = [
-  (value) => !value || value <= 5 || 'Value should be less than 5',
-  (value) => !value || value >= 0.01 || 'Value should be greater or equal 0.01',
-]
+const toleranceRules = computed(() => limits([['le', 5], ['ge', 0.01]]))
 
-const workpieceThicknessRules = [
-  (value) => !value || value >= 5 || 'Value should be greater or equal 5',
-]
+const workpieceThicknessRules = computed(() => limits([['ge', 5]]))
 
 const stepDepthRules = [(value) => !value || value > 0 || 'Value should be greater than 0']
 
-const stepoverRules = [
-  (value) => !value || (value >= 0.1 && value <= 5) || 'Value should be between 0.1 and 5',
-]
+const stepoverRules = computed(() => [between(0.1, 5)])
 
-const toolDiameterRules = [
-  (value) => !value || (value >= 0.1 && value <= 25) || 'Value should be between 0.1 and 25',
-]
+const toolDiameterRules = computed(() => [between(0.1, 25)])
 
 const toolAngleRules = [
   (value) => !value || (value >= 10 && value <= 150) || 'Value should be between 10 and 150',
 ]
 
-const passDepthRules = [
-  (value) => !value || value < 15 || 'Value should be less than 15 mm',
-  (value) => !value || value > 0 || 'Value should be greater than 0',
-]
+const passDepthRules = computed(() => limits([['lt', 15], ['gt', 0]]))
 
 const passesRules = [
   (value) => !value || value <= 20 || 'Value must be less than or equal to 20',
   (value) => !value || value > 0 || 'Value must be greater than 0',
 ]
 
-const cuttingDepthRules = [
-  (value) => value === '' || value > 0 || 'Value must be greater than 0',
-  (value) => value === '' || value <= 24 || 'Value must be less than or equal to 24 mm',
-]
+const cuttingDepthRules = computed(() =>
+  limits([['gt', 0], ['le', 24]], 'mm', true).map((rule) => (value) => value === '' || rule(value)),
+)
 
-const heightRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
+const heightRules = computed(() => limits([['gt', 9]]))
 
-const widthRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
+const widthRules = computed(() => limits([['gt', 9]]))
 
 // Vuelidate setup
 const rules = {
   file: { required },
-  feedSpeed: { numeric },
-  cuttingSpeed: { numeric },
-  coordinateZ: { numeric },
-  cuttingDepth: { numeric },
+  feedSpeed: { decimal },
+  cuttingSpeed: { decimal },
+  coordinateZ: { decimal },
+  cuttingDepth: { decimal },
   maxSize: { numeric },
   height: {
-    numeric,
+    decimal,
     heightWithWidth: (value) => (!!value && !!width.value) || (!value && !width.value),
   },
   width: {
-    numeric,
+    decimal,
     widthWithHeight: (value) => (!!value && !!height.value) || (!value && !height.value),
   },
   tolerance: { decimal },
@@ -681,10 +668,10 @@ const rules = {
   },
   header: { required },
   end: { required },
-  workpieceThickness: { numeric },
-  stepDepth: { numeric },
+  workpieceThickness: { decimal },
+  stepDepth: { decimal },
   passes: { numeric },
-  passDepth: { numeric },
+  passDepth: { decimal },
 }
 
 const v$ = useVuelidate(rules, {
@@ -732,21 +719,40 @@ const platformCutProblem = computed(() => {
 
 const reliefHeightProblem = computed(() => {
   if (mode.value !== 'MC') return ''
-  const thickness = workpieceThickness.value === '' ? 10 : parseFloat(workpieceThickness.value)
-  const height = reliefHeight.value === '' ? DEFAULT_RELIEF_HEIGHT : parseFloat(reliefHeight.value)
+  // the check is done in mm, the message is written in the chosen unit system
+  const thickness = unitToMm(
+    workpieceThickness.value === ''
+      ? inches.value
+        ? 0.4
+        : 10
+      : parseFloat(workpieceThickness.value),
+    unit.value,
+  )
+  const height = unitToMm(
+    reliefHeight.value === ''
+      ? inches.value
+        ? 0.3
+        : DEFAULT_RELIEF_HEIGHT
+      : parseFloat(reliefHeight.value),
+    unit.value,
+  )
   if (isNaN(thickness) || isNaN(height)) return ''
   if (height <= 0) return 'Relief height must be greater than 0.'
   const left = thickness - height
   if (left >= MIN_BOTTOM_THICKNESS) return ''
   const maxHeight = Math.round((thickness - MIN_BOTTOM_THICKNESS) * 10) / 10
-  return `Dangerous distance to the bottom of the workpiece: only ${Math.round(left * 10) / 10} mm would remain under the relief, at least ${MIN_BOTTOM_THICKNESS} mm is required. Reduce the relief height (at most ${maxHeight} mm) or increase the workpiece thickness.`
+  return tu(
+    `Dangerous distance to the bottom of the workpiece: only ${Math.round(left * 10) / 10} mm would remain under the relief, at least ${MIN_BOTTOM_THICKNESS} mm is required. Reduce the relief height (at most ${maxHeight} mm) or increase the workpiece thickness.`,
+  )
 })
 
 const reliefHeightError = computed(() => (reliefTouched.value ? reliefHeightProblem.value : ''))
 
 const engravingDepthProblem = computed(() => {
   if (mode.value !== 'ME') return ''
-  const thickness = workpieceThickness.value === '' ? 10 : parseFloat(workpieceThickness.value)
+  const defaultThickness = inches.value ? 0.4 : 10
+  const thickness =
+    workpieceThickness.value === '' ? defaultThickness : parseFloat(workpieceThickness.value)
   const depth = parseFloat(cuttingDepth.value)
   if (isNaN(thickness) || isNaN(depth) || depth < thickness) return ''
   return 'Cutting depth must be less than the workpiece thickness'
@@ -758,7 +764,9 @@ const cuttingDepthWarnings = computed(() => {
   }
   const max = passes.value * passDepth.value
   if (cuttingDepth.value > max) {
-    return [`Cutting depth exceeds passes × pass depth (${max} mm)`]
+    return [
+      `Cutting depth exceeds passes × pass depth (${parseFloat(max.toPrecision(6))} ${inches.value ? 'in' : 'mm'})`,
+    ]
   }
   return []
 })
@@ -772,7 +780,7 @@ const generatedGcodePreview = computed(() => {
 const heightErrors = computed(() => {
   const errors = []
   if (!v$.value.height.$dirty) return errors
-  if (!v$.value.height.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.height.decimal) errors.push('Only numbers are allowed.')
   if (v$.value.height.heightWithWidth.$invalid) errors.push('Fill both height and width.')
   return errors
 })
@@ -780,7 +788,7 @@ const heightErrors = computed(() => {
 const widthErrors = computed(() => {
   const errors = []
   if (!v$.value.width.$dirty) return errors
-  if (!v$.value.width.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.width.decimal) errors.push('Only numbers are allowed.')
   if (v$.value.width.widthWithHeight.$invalid) errors.push('Fill both height and width.')
   return errors
 })
@@ -1031,6 +1039,7 @@ const converter = async () => {
   const filter = getFitler()
   const formData = new FormData()
 
+  formData.append('unit', unit.value)
   if (feedSpeed.value !== '') formData.append('movement_speed', feedSpeed.value)
   if (cuttingSpeed.value !== '') formData.append('cutting_speed', cuttingSpeed.value)
   if (coordinateZ.value !== '') formData.append('coordinate_z', coordinateZ.value)
@@ -1079,11 +1088,16 @@ const converter = async () => {
     if (engravingToolType.value === 'vbit' && toolAngle.value !== '') {
       formData.append('tool_angle', toolAngle.value)
     }
+    // the 3D view is drawn in mm
     engravingTool.value = {
       type: engravingToolType.value,
-      diameter: parseFloat(engravingToolDiameter.value) || 3,
+      diameter:
+        unitToMm(parseFloat(engravingToolDiameter.value), unit.value) ||
+        unitToMm(inches.value ? 0.125 : 3, unit.value),
       angle: parseFloat(toolAngle.value) || 60,
-      thickness: parseFloat(workpieceThickness.value) || 10,
+      thickness:
+        unitToMm(parseFloat(workpieceThickness.value), unit.value) ||
+        unitToMm(inches.value ? 0.4 : 10, unit.value),
     }
   }
 

@@ -9,6 +9,8 @@
       <p>Supports image format .jpeg .png .svg</p>
 
       <v-form ref="form" @submit.prevent="submit">
+        <UnitSwitch v-model="unit" />
+
         <hr />
 
         <p class="radioTitle">Please select the type of processing:</p>
@@ -117,7 +119,7 @@
             <v-text-field
               v-model="height"
               :error-messages="heightErrors"
-              label="Height (mm)"
+              :label="tu('Height (mm)')"
               :rules="heightRules"
               outlined
               @input="v$.height.$touch()"
@@ -131,7 +133,7 @@
             <v-text-field
               v-model="width"
               :error-messages="widthErrors"
-              label="Width (mm)"
+              :label="tu('Width (mm)')"
               :rules="widthRules"
               outlined
               @input="v$.width.$touch()"
@@ -146,7 +148,7 @@
             <v-text-field
               v-model="tolerance"
               :error-messages="toleranceErrors"
-              label="Tolerance (default 0.2 mm)"
+              :label="tu('Tolerance (default 0.2 mm)', 0.01)"
               :rules="toleranceRules"
               outlined
               @input="v$.tolerance.$touch()"
@@ -160,7 +162,7 @@
               v-model="feedSpeed"
               :rules="rapidRules"
               :error-messages="feedErrors"
-              label="Rapid Speed (default 300 mm/min)"
+              :label="tu('Rapid Speed (default 300 mm/min)', 12)"
               outlined
               @input="v$.feedSpeed.$touch()"
             />
@@ -173,7 +175,7 @@
               v-model="cuttingSpeed"
               :error-messages="cuttingErrors"
               :rules="cuttingRules"
-              label="Cutting Speed (default 150 mm/min)"
+              :label="tu('Cutting Speed (default 150 mm/min)', 6)"
               outlined
               @input="v$.cuttingSpeed.$touch()"
             />
@@ -187,7 +189,7 @@
               v-model="offsetX"
               :error-messages="offsetXErrors"
               :rules="offsetXRules"
-              label="Offset X (default 10 mm)"
+              :label="tu('Offset X (default 10 mm)', 0.4)"
               outlined
               @input="v$.offsetX.$touch()"
             />
@@ -201,7 +203,7 @@
               v-model="offsetY"
               :error-messages="offsetYErrors"
               :rules="offsetYRules"
-              label="Offset Y (default 10 mm)"
+              :label="tu('Offset Y (default 10 mm)', 0.4)"
               outlined
               @input="v$.offsetY.$touch()"
             />
@@ -272,7 +274,7 @@
               v-model="passDepth"
               :error-messages="passDepthErrors"
               :rules="passDepthRules"
-              label="Pass Depth (default 3 mm)"
+              :label="tu('Pass Depth (default 3 mm)', 0.12)"
               outlined
               @input="v$.passDepth.$touch()"
             />
@@ -366,6 +368,8 @@ import { useVuelidate } from '@vuelidate/core'
 import { decimal, numeric, required, requiredIf } from '@vuelidate/validators'
 import ThreeCanvasHelp from './ThreeCanvasHelp.vue'
 import { sendMessage, CLIENT_HEADERS } from '../vscodeApi'
+import UnitSwitch from './UnitSwitch.vue'
+import { useUnitSystem } from '../composables/useUnitSystem'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -377,6 +381,8 @@ const props = defineProps({
 })
 
 const authHeaders = () => (props.authToken ? { Authorization: `Token ${props.authToken}` } : {})
+
+const { unit, tu, rules: limits, between } = useUnitSystem()
 
 // Anonymous users poll and download raster results with a signed token issued by the backend
 const rasterTaskToken = ref('')
@@ -443,67 +449,42 @@ const fileInputRules = [
     'This type of file not accepted!',
 ]
 
-const cuttingRules = [
-  (value) => !value || value < 6000 || 'Value should be less than 6000',
-  (value) => !value || value > 10 || 'Value should be greater than 10',
-]
+const cuttingRules = computed(() => limits([['lt', 6000], ['gt', 10]], 'mm/min'))
 
-const rapidRules = [
-  (value) => !value || value < 10000 || 'Value should be less than 10000',
-  (value) => !value || value > 100 || 'Value should be greater than 100',
-]
+const rapidRules = computed(() => limits([['lt', 10000], ['gt', 100]], 'mm/min'))
 
-const passDepthRules = [
-  (value) => !value || value < 8 || 'Value should be less than 8',
-  (value) => !value || value > 1 || 'Value should be greater than 1',
-]
+const passDepthRules = computed(() => limits([['lt', 8], ['gt', 1]]))
 
 const passesRules = [
   (value) => !value || value < 10 || 'Value should be less than 10',
   (value) => !value || value > 1 || 'Value should be greater than 1',
 ]
 
-const toleranceRules = [
-  (value) => {
-    if (value === '' || value === null || value === undefined) {
-      return true
-    }
+const toleranceRules = computed(() =>
+  mode.value === 'LR' ? [between(0.1, 0.5)] : [between(0.01, 5)],
+)
 
-    if (mode.value === 'LR') {
-      return (value >= 0.1 && value <= 0.5) || 'Value should be between 0.1 and 0.6 for raster mode'
-    }
+const offsetXRules = computed(() => limits([['lt', 1000], ['ge', 0]]))
 
-    return (value >= 0.01 && value <= 5) || 'Value should be between 0.01 and 5'
-  },
-]
+const offsetYRules = computed(() => limits([['lt', 1000], ['ge', 0]]))
 
-const offsetXRules = [
-  (value) => !value || value < 1000 || 'Value should be less than 1000',
-  (value) => !value || value >= 0 || 'Value should be 0 or greater than 0',
-]
+const heightRules = computed(() => limits([['gt', 9]]))
 
-const offsetYRules = [
-  (value) => !value || value < 1000 || 'Value should be less than 1000',
-  (value) => !value || value >= 0 || 'Value should be 0 or greater than 0',
-]
-
-const heightRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
-
-const widthRules = [(value) => !value || value > 9 || 'Value should be greater than 9']
+const widthRules = computed(() => limits([['gt', 9]]))
 
 const rules = {
   file: { required },
-  feedSpeed: { numeric },
-  cuttingSpeed: { numeric },
-  passDepth: { numeric },
+  feedSpeed: { decimal },
+  cuttingSpeed: { decimal },
+  passDepth: { decimal },
   passes: { numeric },
   maxSize: { numeric },
   height: {
-    numeric,
+    decimal,
     heightWithWidth: (value) => (!!value && !!width.value) || (!value && !width.value),
   },
   width: {
-    numeric,
+    decimal,
     widthWithHeight: (value) => (!!value && !!height.value) || (!value && !height.value),
   },
   tolerance: { decimal },
@@ -545,21 +526,21 @@ const fileErrors = computed(() => {
 const feedErrors = computed(() => {
   const errors = []
   if (!v$.value.feedSpeed.$dirty) return errors
-  if (!v$.value.feedSpeed.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.feedSpeed.decimal) errors.push('Only numbers are allowed.')
   return errors
 })
 
 const cuttingErrors = computed(() => {
   const errors = []
   if (!v$.value.cuttingSpeed.$dirty) return errors
-  if (!v$.value.cuttingSpeed.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.cuttingSpeed.decimal) errors.push('Only numbers are allowed.')
   return errors
 })
 
 const passDepthErrors = computed(() => {
   const errors = []
   if (!v$.value.passDepth.$dirty) return errors
-  if (!v$.value.passDepth.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.passDepth.decimal) errors.push('Only numbers are allowed.')
   return errors
 })
 
@@ -580,7 +561,7 @@ const maxSizeErrors = computed(() => {
 const heightErrors = computed(() => {
   const errors = []
   if (!v$.value.height.$dirty) return errors
-  if (!v$.value.height.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.height.decimal) errors.push('Only numbers are allowed.')
   if (v$.value.height.heightWithWidth.$invalid) errors.push('Fill both height and width.')
   return errors
 })
@@ -588,7 +569,7 @@ const heightErrors = computed(() => {
 const widthErrors = computed(() => {
   const errors = []
   if (!v$.value.width.$dirty) return errors
-  if (!v$.value.width.numeric) errors.push('Only numbers are allowed.')
+  if (!v$.value.width.decimal) errors.push('Only numbers are allowed.')
   if (v$.value.width.widthWithHeight.$invalid) errors.push('Fill both height and width.')
   return errors
 })
@@ -720,6 +701,7 @@ const Converter = () => {
 
   const formData = new FormData()
 
+  formData.append('unit', unit.value)
   if (feedSpeed.value !== '') {
     formData.append('movement_speed', feedSpeed.value)
   }

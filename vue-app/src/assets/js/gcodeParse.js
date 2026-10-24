@@ -85,6 +85,25 @@ function checkPositioningSystem (line) {
 }
 
 /**
+check units G20 (inches) G21 (millimeters)
+@return {unitSystem or false}
+**/
+function checkUnitSystem (line) {
+  if (/G20(?!\d)/.test(line)) return 'G20'
+  if (/G21(?!\d)/.test(line)) return 'G21'
+  return false
+}
+
+// the numbers of a prepared line (X Y Z I J K R) multiplied by the factor, to get the scene in mm
+const reAxisNumber = /([XYZIJKR])([-+]?\d*\.?\d+)/g
+
+function scaleLine (line, factor) {
+  return line.replace(reAxisNumber, (match, letter, number) => {
+    return letter + String(Number((Number(number) * factor).toFixed(6)))
+  })
+}
+
+/**
 parse line and seek X,Y,Z linear interpolation
 @return {x, y, z}
 **/
@@ -234,5 +253,7 @@ export {
   checkUsedGcode,
   checkPlaneMode,
   checkPositioningSystem,
+  checkUnitSystem,
+  scaleLine,
   linearInterpolationIncremental
 }
